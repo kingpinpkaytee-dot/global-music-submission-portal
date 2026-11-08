@@ -2,64 +2,52 @@
 
 **Motto: Music. Passion. Legacy.**
 
-Artist Frequency is a free, artist-first music discovery and submission platform concept. It is designed to help independent artists find relevant playlist and radio opportunities, submit releases, and track campaign activity in one place.
+Artist Frequency is a free, artist-first music discovery, campaign and music-submission platform for independent artists worldwide.
 
-## Current repository contents
+## Product rules confirmed
 
-- `index.html` — responsive static frontend demonstration.
-- `supabase/migrations/0001_core_platform.sql` — prepared PostgreSQL schema for artist profiles, submissions, credit ledger, balance view and Row Level Security.
-- `.env.example` — safe public-client configuration template with placeholders only.
-- `docs/PLATFORM_ARCHITECTURE.md` — authentication, submission, credits and security architecture.
+- **40 free credits** on artist registration.
+- Credits reset to exactly **40 every Monday at 00:05 Africa/Johannesburg time**. Months naturally contain four or five Monday resets. Unused credits do not roll over.
+- **1 playlist submission = 1 credit.**
+- **1 radio-station submission = 1 credit.**
+- **1 integrated website-promotion submission = 1 credit.** A website destination must be verified, active and accepting submissions before it can be charged.
+- Admin account: **kingpinpkaytee@gmail.com**. The verified admin account has unlimited submissions.
+- Artists can provide a Spotify Artist profile link and supplementary artist information.
+- Artist verification is awarded only after an authorised admin/trusted integration verifies that the artist follows the official Artist Frequency Spotify playlist.
+- Public counters display registered artists, platforms, curators, radio stations and bloggers from real database records.
+- Marketplace shares require admin approval. Approved songs are published and promoted inside the Artist Frequency website after a 24-hour delay.
+- Marketplace weekly Top 5 is an editorial selection, not an invented popularity chart.
+- Artists can create custom promotion campaign briefs describing how they want the website to promote their music.
 
-## Frontend demonstration features
+## Repository contents
 
-- Track submission form for public DSP links.
-- Genre and country selection, with local-first discovery categories.
-- Playlist and radio opportunity directory concepts.
-- Artist dashboard preview with Pending, Approved and Declined statuses.
-- Browser-local storage for demonstration submissions.
-- Clear disclosure that listings and statuses are not live curator integrations.
+- `index.html` — responsive frontend preview: discovery, submission, public-stat placeholders, marketplace, weekly Top 5, campaign planner, artist profile, and sign-in entry points.
+- `supabase/migrations/0001_core_platform.sql` — artist profiles, submissions, credit ledger and initial RLS.
+- `supabase/migrations/0002_artist_frequency_features.sql` — weekly credits, admin role, verification, directories, campaigns, marketplace and public views.
+- `supabase/migrations/0003_signup_and_public_stats_hardening.sql` — confirmed-email profile/grant handling and aggregate-stat view hardening.
+- `supabase/migrations/0004_submission_credits_and_verification.sql` — one-credit submission RPC and admin playlist-follow verification.
+- `docs/PLATFORM_ARCHITECTURE.md` — backend and security architecture.
+- `docs/PRODUCT_RULES_AND_INTEGRATIONS.md` — confirmed rules and integration requirements.
+- `.env.example` — public-client configuration placeholders only.
 
-## Phase 2 foundation prepared
+## Current implementation status
 
-The database migration defines:
+The website currently remains a **static frontend preview**. Its local forms save only in the visitor's browser. The Supabase migrations and RPCs are prepared source code and have **not** been applied to a live project. Email sign-up, Google sign-in, real credits, live statistics, Spotify popularity sync, verification, moderation queues, campaign submission and automatic marketplace publishing are not active until the backend and scheduled jobs are configured.
 
-- One artist profile linked to each Supabase Auth user.
-- Persistent artist submission records.
-- Status protections so artists cannot directly approve or decline their own submissions.
-- An append-only credit ledger and calculated balance view.
-- Row Level Security policies restricting artist data to its owner.
+## Important integration requirements
 
-**This is prepared infrastructure, not a live backend.** The migration has not been applied to a Supabase project, and authentication, persistent submissions and server-side credit operations are not yet connected to the website.
+- Create/connect a Supabase project and apply migrations in numeric order.
+- Enable email/password and Google OAuth in Supabase Auth; configure Google Cloud OAuth redirect URLs.
+- Keep privileged keys server-side. Never put the Supabase service-role key in browser code.
+- Schedule the Monday 00:05 South African credit reset and marketplace publishing worker.
+- Connect Spotify API access only where approved and available. Never scrape Spotify or invent popularity scores.
+- Configure the official Artist Frequency Spotify playlist URL and admin verification workflow.
+- Populate platform, curator, playlist, radio and blogger directories with verified, permission-appropriate entries.
+- Publish privacy, terms, content-rights and moderation policies before launch.
 
-## Artist-first principles
+## Further documentation
 
-- Free artist access; no paid placement promises.
-- No guaranteed playlist additions, streams or radio plays.
-- Transparent submission status and curator feedback.
-- Country-of-origin discovery before wider international recommendations.
-- Curator and station listings must be verified before being presented as active opportunities.
-
-## Credit policy — decision required
-
-The initial product brief proposes 40 free credits and describes a reset “every Monday of every Month.” The exact calendar rule needs clarification before any automatic reset is implemented. Per-submission costs, rollover and refund rules are also not yet defined. The frontend balance is illustrative only.
-
-## Planned development phases
-
-1. Confirm product identity, artist journey and credit policy.
-2. Connect Supabase Auth and apply/test database migration.
-3. Build secure server-side submission and credit transactions.
-4. Implement verified playlist, curator and radio directories.
-5. Add track metadata lookup and explainable genre/opportunity matching.
-6. Add curator workflows and artist notifications.
-7. Build campaign analytics, soundtrack tracking and artist reporting.
-8. Add moderation, privacy controls, security protections and production deployment checks.
-
-## Development
-
-The current frontend is static HTML/CSS/JavaScript and can be previewed by opening `index.html`. No build tooling is required for the current demo.
-
-## Brand
+See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md` and `docs/PLATFORM_ARCHITECTURE.md` before connecting production credentials.
 
 **Artist Frequency**  
 *Music. Passion. Legacy.*
