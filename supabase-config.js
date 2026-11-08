@@ -1,5 +1,5 @@
-// Public browser configuration only. These values are safe to expose in a frontend.
-// Replace the placeholders with the Supabase Project URL and publishable (or anon) key.
-// NEVER place a service_role key here.
-export const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
-export const SUPABASE_ANON_KEY = "YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY";
+// Public browser configuration only. The publishable/anon key is intended for client use.
+// Database access remains protected by Supabase Row Level Security.
+// NEVER place a service_role key, database password, or OAuth client secret here.
+export const SUPABASE_URL = "https://mdcvewnevgsgmyfnybgn.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_G2mJgmgj555GGhS3bNmqNA_0vcrkk5c";
