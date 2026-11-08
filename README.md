@@ -29,14 +29,17 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 - `docs/PLATFORM_ARCHITECTURE.md` — backend and security architecture.
 - `docs/PRODUCT_RULES_AND_INTEGRATIONS.md` — confirmed rules and integration requirements.
 - `.env.example` — public-client configuration placeholders only.
+- `supabase-config.js` — public Supabase URL/key placeholders (never a service-role key).
+- `src/auth.js` — Supabase JS v2 email registration, password sign-in and Google OAuth client.
+- `docs/PHASE_4_SUPABASE_SETUP.md` — project setup, OAuth configuration, migration sequence and production security gates.
 
 ## Current implementation status
 
-The website currently remains a **static frontend preview**. Its local forms save only in the visitor's browser. The Supabase migrations and RPCs are prepared source code and have **not** been applied to a live project. Email sign-up, Google sign-in, real credits, live statistics, Spotify popularity sync, verification, moderation queues, campaign submission and automatic marketplace publishing are not active until the backend and scheduled jobs are configured.
+The website remains a **frontend preview with a Supabase Auth integration scaffold**. The email registration, password sign-in and Google OAuth client code is now present, but authentication is inactive until the public Supabase Project URL/key are configured in `supabase-config.js` and the Auth providers/redirect URLs are enabled. The Supabase migrations and RPCs are prepared source code and have **not** been applied to a live project. Real credits, live statistics, Spotify popularity sync, verification, moderation queues, campaign submission and automatic marketplace publishing are not active until the backend and scheduled jobs are configured.
 
 ## Important integration requirements
 
-- Create/connect a Supabase project and apply migrations in numeric order.
+- Follow `docs/PHASE_4_SUPABASE_SETUP.md` to create/connect a Supabase project, configure the browser client and apply migrations in numeric order.
 - Enable email/password and Google OAuth in Supabase Auth; configure Google Cloud OAuth redirect URLs.
 - Keep privileged keys server-side. Never put the Supabase service-role key in browser code.
 - Schedule the Monday 00:05 South African credit reset and marketplace publishing worker.
