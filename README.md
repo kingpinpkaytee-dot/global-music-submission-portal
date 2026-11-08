@@ -54,3 +54,9 @@ See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md` and `docs/PLATFORM_ARCHITECTURE.md`
 
 **Artist Frequency**  
 *Music. Passion. Legacy.*
+
+## Production least-privilege table grants (migration 0009)
+
+Migration `0009_least_privilege_artist_finance.sql` removes blanket table grants from `PUBLIC`, `anon`, and `authenticated`, then restores only the operations required by the current RLS policies and public surfaces. Artist campaigns allow authenticated select/insert/update; playlist-follow requests select/insert; artist profiles select/update; submissions and credit ledger select only; Marketplace tracks select/insert for authenticated artists and select for anonymous visitors; weekly Top 5 and published opportunity directories are public read-only. Platform promotion events, platform settings, and weekly reset runs have no direct client table grants. `service_role` retains full table privileges for trusted backend workflows.
+
+These grants do not replace RLS: row ownership, admin checks, and published-state filters remain enforced by existing policies. Profile/ledger writes and submission credit deductions continue through existing triggers and protected RPCs. No data or balances are changed by this migration.
