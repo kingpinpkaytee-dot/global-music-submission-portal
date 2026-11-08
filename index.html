@@ -128,9 +128,8 @@ document.getElementById("campaignForm").addEventListener("submit",e=>{e.preventD
 document.getElementById("artistProfileForm").addEventListener("submit",e=>{e.preventDefault();if(!validHttpUrl(document.getElementById("spotifyArtist").value.trim())){showMessage("profileResult","Please provide a valid Spotify Artist profile URL.");return}const profile={spotifyArtist:document.getElementById("spotifyArtist").value.trim(),name:document.getElementById("profileArtistName").value.trim(),country:document.getElementById("profileCountry").value.trim(),genres:document.getElementById("profileGenres").value.trim(),bio:document.getElementById("profileBio").value.trim(),links:document.getElementById("profileLinks").value.trim()};localStorage.setItem("artistFrequency.profilePreview.v1",JSON.stringify(profile));showMessage("profileResult","Artist information saved in this browser preview. Spotify popularity sync and verification require the live backend and official playlist integration.")});
 renderLocalShares();
 \n
-document.getElementById("authPreviewForm").addEventListener("submit",e=>{e.preventDefault();showMessage("authResult","Authentication is not connected yet. No credentials were stored. Supabase project setup is required before registration can proceed.")});
-document.getElementById("emailSignIn").addEventListener("click",()=>showMessage("authResult","Email sign-in is awaiting the live Supabase Auth connection. No credentials were sent or stored."));
-document.getElementById("googleSignIn").addEventListener("click",()=>{document.getElementById("googleNotice").textContent="Google OAuth is not active yet. Configure the Google provider and redirect URLs in Supabase, then connect the website client."});
+// Authentication handlers are loaded by src/auth.js after public Supabase config is supplied.
 \ndocument.getElementById("year").textContent=new Date().getFullYear();renderOpportunities();refreshDashboard();
 </script>
+<script type="module" src="./src/auth.js"></script>
 </body></html>
