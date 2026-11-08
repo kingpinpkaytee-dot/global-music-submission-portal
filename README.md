@@ -4,17 +4,33 @@
 
 Artist Frequency is a free, artist-first music discovery and submission platform concept. It is designed to help independent artists find relevant playlist and radio opportunities, submit releases, and track campaign activity in one place.
 
-## Current starter website
+## Current repository contents
 
-The first frontend version is published in `index.html` and includes:
+- `index.html` — responsive static frontend demonstration.
+- `supabase/migrations/0001_core_platform.sql` — prepared PostgreSQL schema for artist profiles, submissions, credit ledger, balance view and Row Level Security.
+- `.env.example` — safe public-client configuration template with placeholders only.
+- `docs/PLATFORM_ARCHITECTURE.md` — authentication, submission, credits and security architecture.
 
-- Responsive landing page and artist-focused navigation.
+## Frontend demonstration features
+
 - Track submission form for public DSP links.
 - Genre and country selection, with local-first discovery categories.
 - Playlist and radio opportunity directory concepts.
 - Artist dashboard preview with Pending, Approved and Declined statuses.
 - Browser-local storage for demonstration submissions.
 - Clear disclosure that listings and statuses are not live curator integrations.
+
+## Phase 2 foundation prepared
+
+The database migration defines:
+
+- One artist profile linked to each Supabase Auth user.
+- Persistent artist submission records.
+- Status protections so artists cannot directly approve or decline their own submissions.
+- An append-only credit ledger and calculated balance view.
+- Row Level Security policies restricting artist data to its owner.
+
+**This is prepared infrastructure, not a live backend.** The migration has not been applied to a Supabase project, and authentication, persistent submissions and server-side credit operations are not yet connected to the website.
 
 ## Artist-first principles
 
@@ -24,25 +40,24 @@ The first frontend version is published in `index.html` and includes:
 - Country-of-origin discovery before wider international recommendations.
 - Curator and station listings must be verified before being presented as active opportunities.
 
-## Important: current implementation status
+## Credit policy — decision required
 
-This repository currently contains a **frontend starter/demo**, not a production submission service. The form saves data only in the visitor's browser. It does not create accounts, contact curators, verify playlist availability, deduct or replenish credits, or synchronize submissions between devices. The 40-credit concept is shown as a preview only; final credit rules and reset timing must be defined before backend implementation.
+The initial product brief proposes 40 free credits and describes a reset “every Monday of every Month.” The exact calendar rule needs clarification before any automatic reset is implemented. Per-submission costs, rollover and refund rules are also not yet defined. The frontend balance is illustrative only.
 
 ## Planned development phases
 
 1. Confirm product identity, artist journey and credit policy.
-2. Build secure artist registration, sign-in and account recovery.
-3. Add a database and server-side submission records.
+2. Connect Supabase Auth and apply/test database migration.
+3. Build secure server-side submission and credit transactions.
 4. Implement verified playlist, curator and radio directories.
 5. Add track metadata lookup and explainable genre/opportunity matching.
-6. Implement server-enforced free credits, usage history and transparent reset rules.
-7. Add curator workflows for Pending, Approved and Declined decisions.
-8. Build campaign analytics, soundtrack tracking and artist notifications.
-9. Add moderation, privacy controls, security protections and production deployment checks.
+6. Add curator workflows and artist notifications.
+7. Build campaign analytics, soundtrack tracking and artist reporting.
+8. Add moderation, privacy controls, security protections and production deployment checks.
 
 ## Development
 
-This is a static HTML/CSS/JavaScript starter and can be previewed locally by opening `index.html`. No build tooling is required for the current frontend.
+The current frontend is static HTML/CSS/JavaScript and can be previewed by opening `index.html`. No build tooling is required for the current demo.
 
 ## Brand
 
