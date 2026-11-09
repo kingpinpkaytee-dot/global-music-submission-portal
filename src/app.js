@@ -77,6 +77,9 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
     if (filter === "local") return (item.country || "").toLowerCase() === "south africa";
     if (filter === "playlist") return item.category === "playlist";
     if (filter === "radio") return item.category === "radio_station";
+    if (filter === "curator") return item.category === "curator";
+    if (filter === "blogger") return item.category === "blogger";
+    if (filter === "platform") return item.category === "platform";
     return true;
   });
 
@@ -90,16 +93,24 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
   root.innerHTML = matches.map(item => {
     const title = escapeHtml(item.name);
     const category = escapeHtml(String(item.category || "").replaceAll("_", " ").toUpperCase());
-    const description = escapeHtml(item.description || "Verified opportunity listing.");
+    const description = escapeHtml(item.description || (item.accepts_free_submissions
+      ? "Free submission route. Review the official criteria before sending."
+      : "Official submission route. Check fees, eligibility and terms before submitting."));
     const location = escapeHtml(item.country || "International");
     const genres = Array.isArray(item.genres) ? item.genres : [];
-    const tags = [location, ...genres].map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join("");
+    const tagValues = [location, ...genres];
+    if (item.accepts_free_submissions) tagValues.push("Free submissions");
+    if (item.follower_count !== null && item.follower_count !== undefined) tagValues.push(Number(item.follower_count).toLocaleString() + " followers");
+    if (item.approval_rate !== null && item.approval_rate !== undefined) tagValues.push("Measured approval " + Number(item.approval_rate).toFixed(1) + "%");
+    if (item.response_rate !== null && item.response_rate !== undefined) tagValues.push("Measured response " + Number(item.response_rate).toFixed(1) + "%");
+    if (item.curator_interaction_score !== null && item.curator_interaction_score !== undefined) tagValues.push("Measured interaction " + Number(item.curator_interaction_score).toFixed(1) + "/100");
+    const tags = tagValues.map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join("");
     const link = safeHttpUrl(item.submission_url || item.website_url);
-    const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">View destination â†—</a></p>' : "";
+    const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">View destination ↗</a></p>' : "";
     const submissionStatus = item.is_integrated && item.accepts_submissions
       ? "In-platform submissions open"
-      : "External directory listing Â· in-platform submissions not enabled";
-    return '<article class="opportunity"><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + linkHtml + '</article>';
+      : "External directory listing · in-platform submissions not enabled";
+    return '<article class="opportunity"><div class="award"><span class="award-mark">🏆</span> VERIFIED & APPROVED</div><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + linkHtml + '</article>';
   }).join("");
 }
 
@@ -115,7 +126,7 @@ function populateSubmissionTargets() {
   const available = directoryRecords.filter(item => item.category === category && item.is_integrated && item.accepts_submissions);
   targetSelect.innerHTML = '<option value="">Choose an integrated destination</option>' +
     available.map(item => '<option value="' + escapeHtml(item.id) + '">' +
-      escapeHtml(item.name) + (item.country ? " â€” " + escapeHtml(item.country) : "") +
+      escapeHtml(item.name) + (item.country ? " — " + escapeHtml(item.country) : "") +
       '</option>').join("");
   targetSelect.disabled = available.length === 0;
   if (!available.length) {
@@ -127,7 +138,7 @@ async function loadDirectory() {
   if (!supabase) return;
   const { data, error } = await supabase
     .from("opportunity_directories")
-    .select("id,category,name,country,website_url,submission_url,genres,is_integrated,accepts_submissions")
+    .select("id,category,name,country,website_url,submission_url,genres,is_integrated,accepts_submissions,accepts_free_submissions,activity_status,follower_count,approval_rate,response_rate,curator_interaction_score,last_checked_at,source_url,source_evidence_url,data_confidence")
     .eq("is_public", true)
     .eq("is_active", true)
     .eq("is_verified", true)
@@ -189,7 +200,7 @@ function renderTopFive(items) {
   }
   root.innerHTML = items.map(item => {
     const url = safeHttpUrl(item.track_url);
-    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen â†—</a></p>' : "";
+    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen ↗</a></p>' : "";
     const artwork = safeHttpUrl(item.artwork_url);
     const image = artwork ? '<img src="' + escapeHtml(artwork) + '" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;margin:8px 0">' : "";
     return '<article class="feature"><div class="rank">#' + Number(item.rank) + '</div>' + image +
@@ -209,8 +220,8 @@ function renderPublishedMarketplace(items) {
     const url = safeHttpUrl(item.track_url);
     const art = safeHttpUrl(item.artwork_url);
     const image = art ? '<img src="' + escapeHtml(art) + '" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;margin-bottom:12px">' : "";
-    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen â†—</a></p>' : "";
-    const meta = [item.genre, item.country].filter(Boolean).join(" Â· ");
+    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen ↗</a></p>' : "";
+    const meta = [item.genre, item.country].filter(Boolean).join(" · ");
     return '<article class="opportunity">' + image + '<div class="eyebrow">' +
       (item.is_promoted ? "FEATURED MARKETPLACE RELEASE" : "MARKETPLACE RELEASE") +
       '</div><h3>' + escapeHtml(item.track_title) + '</h3><p>' +
@@ -314,9 +325,9 @@ async function loadArtistSubmissions() {
     const status = String(item.status || "pending").toLowerCase();
     const feedback = item.curator_feedback ? '<p class="muted" style="margin:6px 0 0">' + escapeHtml(item.curator_feedback) + '</p>' : "";
     const url = safeHttpUrl(item.track_url);
-    const link = url ? '<a target="_blank" rel="noopener noreferrer" href="' + escapeHtml(url) + '">Track link â†—</a>' : "";
+    const link = url ? '<a target="_blank" rel="noopener noreferrer" href="' + escapeHtml(url) + '">Track link ↗</a>' : "";
     return '<div class="track"><div><b>' + escapeHtml(item.track_title) + '</b><br><span class="muted">' +
-      escapeHtml(item.artist_name) + ' Â· ' + escapeHtml(item.genre) + ' Â· ' + escapeHtml(item.country) +
+      escapeHtml(item.artist_name) + ' · ' + escapeHtml(item.genre) + ' · ' + escapeHtml(item.country) +
       '</span><br>' + link + feedback + '</div><span class="status ' + escapeHtml(status) + '">' +
       escapeHtml(status) + '</span></div>';
   }).join("");
@@ -383,7 +394,7 @@ async function loadMarketplaceShares() {
   root.innerHTML = items.map(item => {
     const status = String(item.moderation_status || "pending").toLowerCase();
     return '<div class="track"><div><b>' + escapeHtml(item.track_title) + '</b><br><span class="muted">' +
-      escapeHtml(item.artist_display_name) + ' Â· ' + escapeHtml(item.genre) +
+      escapeHtml(item.artist_display_name) + ' · ' + escapeHtml(item.genre) +
       '</span></div><span class="status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span></div>';
   }).join("");
 }
@@ -427,7 +438,7 @@ async function loadCampaigns() {
   root.className = "";
   root.innerHTML = items.map(item =>
     '<div class="track"><div><b>' + escapeHtml(item.title) + '</b><br><span class="muted">' +
-    escapeHtml(item.campaign_goal) + ' Â· ' + escapeHtml((item.target_countries || []).join(", ")) +
+    escapeHtml(item.campaign_goal) + ' · ' + escapeHtml((item.target_countries || []).join(", ")) +
     '</span></div><span class="status ' + escapeHtml(item.status) + '">' +
     escapeHtml(item.status.replaceAll("_", " ")) + '</span></div>'
   ).join("");
@@ -474,9 +485,9 @@ async function loadAdminMarketplaceQueue() {
   root.className = "";
   root.innerHTML = items.map(item => {
     const url = safeHttpUrl(item.track_url);
-    const link = url ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Open DSP link â†—</a>' : "";
+    const link = url ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Open DSP link ↗</a>' : "";
     return '<div class="track"><div><b>' + escapeHtml(item.track_title) + '</b><br><span class="muted">' +
-      escapeHtml(item.artist_display_name) + ' Â· ' + escapeHtml(item.genre) + ' Â· ' + escapeHtml(item.country || "") +
+      escapeHtml(item.artist_display_name) + ' · ' + escapeHtml(item.genre) + ' · ' + escapeHtml(item.country || "") +
       '</span><br>' + link + '</div><div style="display:flex;gap:8px"><button class="btn primary" data-review="approved" data-track="' +
       escapeHtml(item.id) + '">Approve</button><button class="btn" data-review="declined" data-track="' +
       escapeHtml(item.id) + '">Decline</button></div></div>';
@@ -523,9 +534,9 @@ function renderAdminDirectoryRecords() {
       item.accepts_submissions ? "Accepting submissions" : "Submissions locked"
     ].map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join(" ");
     const link = safeHttpUrl(item.submission_url || item.website_url);
-    const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Official link â†—</a>' : "";
+    const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Official link ↗</a>' : "";
     return '<div class="track"><div><b>' + escapeHtml(item.name) + '</b><br><span class="muted">' +
-      escapeHtml(item.category.replaceAll("_", " ")) + ' Â· ' + escapeHtml(item.country || "Country not set") +
+      escapeHtml(item.category.replaceAll("_", " ")) + ' · ' + escapeHtml(item.country || "Country not set") +
       '</span><div style="margin-top:8px">' + tags + '</div><div style="margin-top:6px">' + linkHtml +
       '</div></div><button type="button" class="btn" data-directory-edit="' + escapeHtml(item.id) + '">Edit</button></div>';
   }).join("");
@@ -534,7 +545,7 @@ function renderAdminDirectoryRecords() {
 async function loadAdminDirectory() {
   if (!supabase || !currentUser || currentRole !== "admin") return;
   const root = byId("adminDirectoryList");
-  if (root) root.textContent = "Loading directory recordsâ€¦";
+  if (root) root.textContent = "Loading directory records…";
   const { data, error } = await supabase
     .from("opportunity_directories")
     .select("id,category,name,country,website_url,submission_url,contact_email,genres,is_verified,is_active,is_public,verification_evidence_url,is_integrated,accepts_submissions,verified_at,updated_at")
@@ -753,9 +764,9 @@ async function updateSessionUser(user) {
       byId("trackList").className = "empty";
       byId("trackList").textContent = "Sign in to view your submissions.";
     }
-    if (byId("creditBalance")) byId("creditBalance").textContent = "â€”";
+    if (byId("creditBalance")) byId("creditBalance").textContent = "—";
     ["profileArtistName", "profileCountry", "profileBio", "profileWebsite", "profilePressKit", "spotifyArtist", "profileGenres", "profileLinks"].forEach(id => { if (byId(id)) byId(id).value = ""; });
-    if (byId("spotifyPopularity")) byId("spotifyPopularity").textContent = "â€”";
+    if (byId("spotifyPopularity")) byId("spotifyPopularity").textContent = "—";
     if (byId("verificationStatus")) byId("verificationStatus").textContent = "Not verified";
     if (byId("trackCount")) byId("trackCount").textContent = "0";
     ["pendingCount", "approvedCount", "declinedCount"].forEach(id => { if (byId(id)) byId(id).textContent = "0"; });
