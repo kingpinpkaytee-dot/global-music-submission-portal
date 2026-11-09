@@ -16,7 +16,7 @@
 5. Review campaign requests and confirm that proposed channels are actually integrated before describing a campaign as active.
 6. Monitor abuse, fraudulent playlist offers and directory accuracy.
 
-The production website does not yet contain the complete administrative interface. Directory management, campaign review and Top 5 selection require protected admin UI/backend workflows; do not work around the absence of those tools by exposing service-role credentials to the browser.
+The current protected admin page supports Marketplace track approval and decline through the `admin_review_marketplace_track` RPC. The complete administrative interface is not yet finished: directory management, campaign review and weekly Top 5 selection still require protected admin UI/backend workflows. Do not work around the absence of those tools by exposing service-role credentials to the browser.
 
 ## Credit administration
 

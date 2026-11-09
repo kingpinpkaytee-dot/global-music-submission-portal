@@ -1,6 +1,6 @@
 # Phase 4 — Supabase connection, migrations and authentication
 
-This runbook is for a **new Supabase environment** or a controlled rebuild. The existing Artist Frequency production project is already linked and migrations 0001–0013 are applied. Do not reapply migrations or create a second production project just to follow this guide.
+This runbook is for a **new Supabase environment** or a controlled rebuild. The existing Artist Frequency production project is already linked and migrations 0001–0014 are applied. Do not reapply migrations or create a second production project just to follow this guide.
 
 ## 1. Create or select a Supabase project
 
@@ -15,7 +15,7 @@ Never place a service-role/secret key, database password or OAuth client secret 
 
 The browser config is `supabase-config.js`. It contains only the public Project URL and publishable key. For a separate staging project, use its own environment-specific values and avoid accidentally replacing production configuration.
 
-The site loads Supabase JS v2 from jsDelivr. `src/auth.js` contains email/password registration and sign-in plus the Google OAuth client flow. Provider availability is controlled by Supabase Auth settings.
+The site loads Supabase JS v2 from jsDelivr. `src/supabase-client.js` creates the shared browser client; `src/auth.js` handles email/password registration, sign-in, Google OAuth and sign-out; `src/app.js` connects the artist profile, public statistics, verified directories, credit balance, protected submissions, campaigns and Marketplace flows to Supabase. Google provider availability is controlled by Supabase Auth settings.
 
 ## 3. Link the Supabase CLI
 
@@ -45,6 +45,7 @@ For a new environment, apply every migration in ascending numeric order:
 11. `0011_harden_default_privileges.sql`
 12. `0012_serialize_weekly_credit_reset.sql`
 13. `0013_restrict_updated_at_trigger_execution.sql`
+14. `0014_artist_profile_genres_and_press_kit.sql`
 
 Review the pending migration list before any deployment:
 
@@ -102,4 +103,4 @@ Do not manually run `run_weekly_credit_reset()` on production as a test. It chan
 
 ## Current boundary
 
-The Supabase production schema, least-privilege grants, RLS policies, credit submission RPC, weekly reset routine, Marketplace publisher and cron registrations are deployed. The public website is still a frontend preview; account workflows, artist dashboards, submissions, campaigns, Marketplace and administrative tools must be wired to the backend and validated before a public launch.
+The Supabase production schema through migration 0014, least-privilege grants, RLS policies, credit submission RPC, weekly reset routine, Marketplace publisher and cron registrations are deployed. The frontend is wired to Supabase for authentication, profile, public directory/statistics, credit balance, submissions, campaign requests, Marketplace publishing display/shares and Marketplace approval/decline. Browser ES-module syntax and DOM references have been checked, but the complete user journey still requires browser validation after the site is served over HTTPS. The repository itself is not a hosting deployment. Remaining admin work includes directory management, campaign review and weekly Top 5 selection; Google OAuth and Spotify-based integrations require their provider/API configuration.

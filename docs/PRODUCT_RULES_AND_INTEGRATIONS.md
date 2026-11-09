@@ -23,7 +23,7 @@ Supabase Auth provides email/password registration and sign-in. The browser cont
 
 A database trigger creates each artist profile. The admin role is assigned only when Supabase confirms the configured admin email. Never trust user-editable metadata to grant admin privileges.
 
-Profile fields include artist/display name, country, biography, Spotify Artist URL, website and social links. Public profile information must be clearly separated from private account/contact information.
+Profile fields include artist/display name, country, biography, genres, Spotify Artist URL, website, social links and an optional press-kit URL. Migration 0014 adds the structured genre array and press-kit URL. Public profile information must be clearly separated from private account/contact information.
 
 ## Spotify popularity
 
@@ -70,11 +70,11 @@ Artists may describe their goals, preferred channels, target countries, genres, 
 
 ## Production deployment status — 9 November 2026
 
-The Supabase production project is linked and migrations 0001–0013 are applied. The database has 11 public tables with RLS enabled and 20 RLS policies. Table/view grants use least privilege; default privileges for future public objects are hardened; privileged functions have explicit execution grants.
+The Supabase production project is linked and migrations 0001–0014 are applied. The database has 11 public tables with RLS enabled and 20 RLS policies. Table/view grants use least privilege; default privileges for future public objects are hardened; privileged and trigger-only functions have explicit execution grants. Migration 0014 adds structured artist genres and a press-kit URL.
 
 The weekly credit reset and five-minute Marketplace publisher cron jobs are active. Marketplace publishing has successful recorded runs. The weekly reset is registered for Monday 00:05 SAST; its first scheduled execution after deployment must be confirmed from cron history.
 
-The production database and backend routines are deployed, but the website is still a frontend preview. Some forms currently save to browser localStorage, and the artist dashboard, directory discovery, credit display, submission workflow, campaign workflow, Marketplace and admin tools still need full live-backend integration.
+The browser frontend now connects to the deployed backend for email/password authentication, artist profile read/update, public statistics, verified directory discovery, credit balance, credit-charged submissions, campaign create/read, Marketplace share/publication and admin Marketplace moderation. The old localStorage write handlers have been removed. JavaScript ES-module syntax and static DOM-binding checks passed. Hosted-site browser testing with anonymous, artist and admin sessions is still required before public launch; the repository is not itself a hosting deployment.
 
 ## Remaining integration gates
 

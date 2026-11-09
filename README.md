@@ -1,4 +1,4 @@
-﻿# Artist Frequency — Global Music Submission Portal
+# Artist Frequency — Global Music Submission Portal
 
 **Motto: Music. Passion. Legacy.**
 
@@ -20,7 +20,7 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 ## Production status — 9 November 2026
 
-The Supabase production project is linked and migrations **0001–0013** are applied.
+The Supabase production project is linked and migrations **0001–0014** are applied.
 
 - **11/11 public tables have RLS enabled.**
 - **20 RLS policies** are installed.
@@ -30,15 +30,29 @@ The Supabase production project is linked and migrations **0001–0013** are app
 - The Marketplace publisher job runs every five minutes. Its production scheduler job has completed successfully in a recorded run.
 - The registration/profile trigger and credit ledger rules are deployed. The protected submission RPC validates integrated destinations and deducts credits atomically.
 - Weekly resets take the same per-artist profile-row lock as credit-charged submissions, so a submission racing the Monday reset cannot leave an off-by-one balance.
+- Migration 0014 adds structured artist genres and a press-kit URL to artist profiles.
 - No production balances or artist records were changed by the permissions migrations.
 
-The website is still a **frontend preview with an authentication integration scaffold**, not a finished production application. The Supabase JS client includes email/password and Google OAuth flows, but provider settings and redirect URLs must be confirmed before sign-in is exposed. Dashboard, submission, campaign, moderation and directory screens still need full frontend wiring to the deployed backend.
+## Live frontend integration
 
-Spotify popularity data is not fabricated or scraped. Popularity sync requires approved Spotify API access. Artist playlist-follow verification remains disabled until the official playlist URL/ID and trusted verification workflow are configured.
+The single-page frontend now uses the shared Supabase JS v2 client in `src/supabase-client.js` and the application layer in `src/app.js`. The old browser-localStorage submission, Marketplace share, campaign and artist-profile write handlers have been removed.
+
+Connected frontend flows include:
+- Email/password sign-up and sign-in through Supabase Auth, session persistence and sign-out.
+- Artist profile read/update, including artist name, country, biography, genres, website/social links, Spotify Artist URL and press-kit URL.
+- Live public platform statistics and verified directory listings.
+- Credit balance from the ledger-backed balance view.
+- Credit-charged playlist, radio and website submissions through the protected `submit_artist_opportunity` RPC.
+- Artist campaign creation and retrieval.
+- Marketplace release sharing, public published-track/weekly Top 5 display, and a restricted admin Marketplace approval/decline queue.
+
+Google OAuth still requires its provider and redirect URL to be configured in Supabase Auth. The browser code includes the OAuth flow, but availability must be confirmed in the Supabase dashboard. Spotify popularity is shown only from the dedicated `spotify_popularity` API field; no scraped or invented score is used. Playlist-follow verification remains disabled until the official playlist URL/ID and trusted verification process are configured.
+
+The frontend has passed JavaScript ES-module syntax checks and a static DOM-binding check. A full browser sign-up/sign-in and end-to-end artist/admin workflow still needs to be exercised in the hosted site with separate test accounts. The repository source is not itself a hosting deployment; configure and publish the static site over HTTPS before inviting artists.
 
 ## Repository contents
 
-- `index.html` — responsive frontend preview for discovery, submissions, public stats, Marketplace, weekly Top 5, campaign planning, artist profile and sign-in entry points.
+- `index.html` — responsive portal UI for discovery, submissions, live stats, Marketplace, weekly Top 5, campaigns, artist profile and sign-in.
 - `supabase/migrations/0001_core_platform.sql` — core schema, credit-balance view and initial RLS.
 - `supabase/migrations/0002_artist_frequency_features.sql` — artist features, directories, campaigns, Marketplace, weekly Top 5 and public views.
 - `supabase/migrations/0003_signup_and_public_stats_hardening.sql` — confirmed-email profile/grant handling and aggregate-stat view hardening.
@@ -52,7 +66,10 @@ Spotify popularity data is not fabricated or scraped. Popularity sync requires a
 - `supabase/migrations/0011_harden_default_privileges.sql` — least-privilege defaults for future tables, views, sequences and functions.
 - `supabase/migrations/0012_serialize_weekly_credit_reset.sql` — per-artist locking to serialize weekly resets against credit-charged submissions.
 - `supabase/migrations/0013_restrict_updated_at_trigger_execution.sql` — removes direct browser-role execution of the updated-at trigger helper.
-- `src/auth.js` — Supabase JS v2 email registration, password sign-in and Google OAuth client.
+- `supabase/migrations/0014_artist_profile_genres_and_press_kit.sql` — structured artist genre and press-kit fields.
+- `src/supabase-client.js` — one shared Supabase client and safe public-key configuration check.
+- `src/auth.js` — email/password, Google OAuth, session handling and sign-out.
+- `src/app.js` — live public data, artist dashboard, submissions, campaigns, Marketplace and admin moderation integration.
 - `supabase-config.js` — public Supabase URL and publishable key only; never place a service-role key here.
 - `docs/PLATFORM_ARCHITECTURE.md` — backend and security architecture.
 - `docs/PRODUCT_RULES_AND_INTEGRATIONS.md` — confirmed rules and integration requirements.
@@ -60,15 +77,17 @@ Spotify popularity data is not fabricated or scraped. Popularity sync requires a
 
 ## Setup and operational requirements
 
-For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0013 applied.
+For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0014 applied.
 
 - Enable and verify email/password and Google OAuth providers; configure the Google Cloud OAuth client and Supabase redirect allowlist.
+- Serve the frontend over HTTPS and set the exact Site URL and allowed redirect URLs in Supabase Auth.
 - Keep service-role keys, database passwords and OAuth client secrets server-side. The browser may use only the publishable/anon key.
 - New public tables, views, sequences and functions require explicit client grants when a browser-facing workflow needs them.
 - Keep the Monday credit reset and five-minute Marketplace publisher schedules enabled.
 - Configure the official Artist Frequency Spotify playlist and authorised verification workflow before enabling playlist-follow verification.
 - Populate directories only with verified, active and permission-appropriate opportunities.
-- Publish privacy, terms, content-rights and moderation policies before launch.
+- Complete protected admin tools for directory management, campaign review and weekly Top 5 selection.
+- Publish privacy, terms, content-rights and moderation policies before public launch.
 
 ## Further documentation
 

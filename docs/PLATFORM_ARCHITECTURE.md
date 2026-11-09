@@ -2,7 +2,7 @@
 
 ## Production backend
 
-Artist Frequency uses Supabase Auth and PostgreSQL. The production project is linked to this repository, and migrations 0001–0013 have been applied.
+Artist Frequency uses Supabase Auth and PostgreSQL. The production project is linked to this repository, and migrations 0001–0014 have been applied.
 
 The database currently contains 11 public tables, all with Row Level Security enabled, and 20 RLS policies. Explicit grants restrict browser roles to the operations needed by each workflow. Public Marketplace and directory views are read-only, credit balances are authenticated-only, and trusted server automation retains service-role access.
 
@@ -13,7 +13,7 @@ The database currently contains 11 public tables, all with Row Level Security en
 3. Signed-in artists can read and update their own profile. A database trigger prevents artists changing role, verification, or Spotify popularity fields.
 4. Supabase sessions are persisted by the browser client. Never store passwords in application tables.
 
-Profile data includes artist name, country, biography, website, social links and an optional Spotify Artist URL. Spotify popularity remains unavailable until a permitted Spotify API integration returns verified data. Do not scrape Spotify or invent a score.
+Profile data includes artist name, country, biography, genres, website, social links, an optional press-kit URL and an optional Spotify Artist URL. Migration 0014 adds the structured genre array and press-kit URL. Spotify popularity remains unavailable until a permitted Spotify API integration returns the dedicated Spotify popularity field. Do not scrape Spotify, substitute a separate platform score, or invent a value.
 
 ## Credit policy and submissions
 
@@ -65,16 +65,19 @@ Public statistics are database-backed aggregate counts. Do not hard-code or inve
 
 ## Current implementation boundary
 
-The production database, RLS, credit RPC, Marketplace moderation/publisher routine and scheduled jobs are deployed. The static website still contains local-demo handlers and several preview-only sections; it is not yet a complete production frontend. Authentication and the individual artist workflows must be wired to the live database and validated before public launch.
+The production database, RLS, credit RPC, Marketplace moderation/publisher routine and scheduled jobs are deployed. The frontend now uses a shared Supabase JS client and a live application module for email/password authentication, artist profile read/update, public statistics, verified directory listings, credit balance, credit-charged submissions, campaign create/read, Marketplace share/publication and admin Marketplace moderation. Browser ES-module syntax and static DOM bindings have passed checks. The full browser journey still needs testing on the hosted HTTPS site with separate anonymous, artist and admin sessions before public launch. The source repository itself is not a hosting deployment.
 
-Playlist-follow verification remains disabled until the official Artist Frequency Spotify playlist URL/ID and trusted verification process are configured. Directory-management and Marketplace Top 5 editorial tools also require protected admin workflows before they can be operated from the website.
+Playlist-follow verification remains disabled until the official Artist Frequency Spotify playlist URL/ID and trusted verification process are configured. The current protected admin page supports Marketplace track approval and decline. Directory management, campaign review and Marketplace Top 5 editorial selection still require protected admin workflows before they can be operated from the website.
 
 ## Launch gates
 
 - Configure and verify email/password, Google OAuth (if enabled), site URLs and redirect allowlists.
 - Require MFA for the administrator.
 - Populate the directories with verified, active, permitted opportunities.
-- Complete the authenticated artist dashboard, profile, submission, campaign and Marketplace frontend flows.
+- Finish hosted-site browser validation for authentication, artist profile, submission, campaign and Marketplace flows.
 - Build protected admin screens for directory management, moderation, campaign review and weekly Top 5 selection.
 - Test anonymous, artist A, artist B, and admin access against production-like test data without manually changing production balances.
+- Publish privacy, terms, copyright/rights and moderation policies, plus account deletion and data-retention procedures.
+pyright/rights and moderation policies, plus account deletion and data-retention procedures.
+ artist B, and admin access against production-like test data without manually changing production balances.
 - Publish privacy, terms, copyright/rights and moderation policies, plus account deletion and data-retention procedures.
