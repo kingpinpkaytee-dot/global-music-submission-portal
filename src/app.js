@@ -249,6 +249,8 @@ async function loadArtistProfile() {
   currentRole = data.role || "artist";
   const adminArea = byId("adminArea");
   if (adminArea) adminArea.hidden = currentRole !== "admin";
+  const adminDashboardTile = byId("adminDashboardTile");
+  if (adminDashboardTile) adminDashboardTile.hidden = currentRole !== "admin";
   return data;
 }
 
@@ -621,6 +623,7 @@ async function updateSessionUser(user) {
   if (!currentUser) {
     currentRole = "artist";
     if (byId("adminArea")) byId("adminArea").hidden = true;
+    if (byId("adminDashboardTile")) byId("adminDashboardTile").hidden = true;
     if (byId("trackList")) {
       byId("trackList").className = "empty";
       byId("trackList").textContent = "Sign in to view your submissions.";

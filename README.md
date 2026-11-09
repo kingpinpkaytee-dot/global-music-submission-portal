@@ -38,6 +38,10 @@ The Supabase production project is linked and migrations **0001–0015** are app
 
 The single-page frontend now uses the shared Supabase JS v2 client in `src/supabase-client.js` and the application layer in `src/app.js`. The old browser-localStorage submission, Marketplace share, campaign and artist-profile write handlers have been removed.
 
+## Dashboard navigation
+
+The Dashboard is a workspace launcher rather than one continuous spreadsheet-style page. Each selection opens a dedicated browser tab using its own `?view=` route: submissions and credits, opportunity discovery, Marketplace, campaign planner, artist profile, account/sign-in, community statistics and the admin workspace. Each focused view includes a return-to-Dashboard link. The administrator selection is shown only after the signed-in profile confirms the admin role; database policies and RPC checks remain the authority for protected actions.
+
 Connected frontend flows include:
 - Email/password sign-up and sign-in through Supabase Auth, session persistence and sign-out.
 - Artist profile read/update, including artist name, country, biography, genres, website/social links, Spotify Artist URL and press-kit URL.

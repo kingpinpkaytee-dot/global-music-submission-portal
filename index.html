@@ -13,15 +13,26 @@
 
 .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.statbox{background:#151c2b;border:1px solid var(--line);border-radius:15px;padding:18px}.statbox strong{display:block;font-size:30px;color:var(--gold)}.statbox span{font-size:11px;color:var(--muted)}.top-five{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.top-five .feature{padding:16px}.rank{font-size:24px;color:var(--gold);font-weight:900}.auth-actions{display:flex;gap:10px;flex-wrap:wrap}.auth-actions .btn{flex:1}.feature-form{margin-top:16px}
 @media(max-width:850px){.stats-grid{grid-template-columns:repeat(3,1fr)}.top-five{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.stats-grid{grid-template-columns:repeat(2,1fr)}.top-five{grid-template-columns:1fr}}
+.dashboard-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.dashboard-tile{display:flex;flex-direction:column;min-height:150px;padding:22px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,#151c2b,#101521);transition:transform .18s,border-color .18s}.dashboard-tile:hover{transform:translateY(-3px);border-color:var(--gold)}.dashboard-tile .tile-icon{font-size:25px;color:var(--gold);margin-bottom:12px}.dashboard-tile strong{font-size:16px}.dashboard-tile span:last-child{color:var(--muted);font-size:12px;margin-top:6px}.dashboard-open-note{color:var(--muted);font-size:12px;margin-top:18px}body[data-dashboard-window="true"] main>section{padding-top:38px;min-height:calc(100vh - 150px)}body[data-dashboard-window="true"] main>section[hidden]{display:none!important}body[data-dashboard-window="true"] .links{display:none}@media(max-width:850px){.dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.dashboard-grid{grid-template-columns:1fr}.dashboard-tile{min-height:125px}}
 </style>
 </head>
 <body>
 <header class="topbar"><div class="wrap nav">
-<a class="brand" href="#home"><span class="logo">A</span><span>ARTIST FREQUENCY<small>MUSIC. PASSION. LEGACY.</small></span></a>
+<a class="brand" id="brandLink" href="#home"><span class="logo">A</span><span>ARTIST FREQUENCY<small>MUSIC. PASSION. LEGACY.</small></span></a>
 <nav class="links"><a href="#how">How it works</a><a href="#discover">Discover</a><a href="#marketplace">Marketplace</a><a href="#campaigns">Campaigns</a><a href="#submit">Submit music</a><a href="#sign-in">Sign in</a></nav>
-<div class="nav-actions"><a class="btn ghost" href="#dashboard">Artist area</a><a class="btn primary" href="#submit">Submit a track ↗</a></div>
+<div class="nav-actions"><a class="btn ghost" href="?view=dashboard" target="_blank" rel="noopener">Dashboard ↗</a><a class="btn primary" href="?view=submissions" target="_blank" rel="noopener">Submit a track ↗</a></div>
 </div></header>
 <main id="home">
+<section class="section" id="dashboard-home" hidden><div class="wrap"><div class="section-head"><div><div class="eyebrow">Artist control centre</div><h2>Your Dashboard.</h2></div><p>Choose a workspace. Each selection opens in its own browser tab, with a focused page instead of one long scrolling layout.</p></div><div class="dashboard-grid">
+<a class="dashboard-tile" href="?view=submissions" target="_blank" rel="noopener"><span class="tile-icon">♫</span><strong>Submissions & credits ↗</strong><span>Submit tracks, review statuses and check your balance.</span></a>
+<a class="dashboard-tile" href="?view=discover" target="_blank" rel="noopener"><span class="tile-icon">◎</span><strong>Discover opportunities ↗</strong><span>Browse verified public playlist, radio and website listings.</span></a>
+<a class="dashboard-tile" href="?view=marketplace" target="_blank" rel="noopener"><span class="tile-icon">✦</span><strong>Marketplace ↗</strong><span>Explore featured releases and manage your shared tracks.</span></a>
+<a class="dashboard-tile" href="?view=campaigns" target="_blank" rel="noopener"><span class="tile-icon">⌁</span><strong>Campaign planner ↗</strong><span>Create promotion briefs and review campaign requests.</span></a>
+<a class="dashboard-tile" href="?view=profile" target="_blank" rel="noopener"><span class="tile-icon">♙</span><strong>Artist profile ↗</strong><span>Update your biography, genres, links and verification details.</span></a>
+<a class="dashboard-tile" href="?view=account" target="_blank" rel="noopener"><span class="tile-icon">⎆</span><strong>Account & sign-in ↗</strong><span>Register, sign in, continue with Google or sign out.</span></a>
+<a class="dashboard-tile" href="?view=stats" target="_blank" rel="noopener"><span class="tile-icon">▤</span><strong>Community statistics ↗</strong><span>View live public Artist Frequency counts.</span></a>
+<a class="dashboard-tile" id="adminDashboardTile" href="?view=admin" target="_blank" rel="noopener" hidden><span class="tile-icon">⚙</span><strong>Administrator workspace ↗</strong><span>Moderate Marketplace releases and maintain verified directories.</span></a>
+</div><p class="dashboard-open-note">↗ Every workspace opens separately. Keep this Dashboard tab open as your launchpad.</p></div></section>
 <section class="wrap hero"><div><div class="eyebrow">A global stage for independent sound</div><h1>Your music.<br><span>More ears.</span><br>Zero fees.</h1><p class="lead">Discover playlist and radio opportunities, find the right audience for your sound, and keep every submission organised — all in one free artist hub.</p><div class="hero-cta"><a class="btn primary" href="#submit">Start a free submission →</a><a class="btn" href="#discover">Explore opportunities</a></div><div class="trust"><span>✓ <b>Free to use</b></span><span>✓ Independent-artist first</span><span>✓ No placement guarantees</span></div></div>
 <aside class="hero-card"><div class="card-head"><span>ARTIST FREQUENCY · FREE ACCESS</span><span class="live-dot">● READY</span></div><div class="metric">40 <span style="font-size:15px;color:var(--gold)">credits</span></div><div class="metric-sub">Weekly free-credit allowance · resets Monday 00:05 SAST</div><div style="height:18px"></div><div class="mini-row"><span>Playlist opportunities</span><b>Discover</b></div><div class="mini-row"><span>Radio opportunities</span><b>Worldwide</b></div><div class="mini-row"><span>Submission tracking</span><span class="pill">Pending · Approved · Declined</span></div><div class="mini-row"><span>Artist dashboard</span><b>One place</b></div><p class="form-note">Your personal balance is shown in the signed-in artist workspace. Credits can only be used with a verified, active destination that has a working delivery integration and is accepting submissions.</p></aside>
 </section>
@@ -123,6 +134,36 @@
 </main>
 <footer class="footer"><div class="wrap footer-row"><div><b style="color:var(--text)">ARTIST FREQUENCY</b><br>Music. Passion. Legacy.</div><div>Independent music deserves a fair shot. Built for discovery, transparency and access.</div><div>© <span id="year"></span> Artist Frequency · Free artist-first concept</div></div></footer>
 <script>
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view");
+  const routes = {
+    dashboard: "dashboard-home",
+    submissions: "submit",
+    discover: "discover",
+    marketplace: "marketplace",
+    campaigns: "campaigns",
+    profile: "artist-account",
+    account: "sign-in",
+    stats: "public-stats",
+    admin: "adminArea"
+  };
+  if (!view || !routes[view]) return;
+  const targetId = routes[view];
+  document.body.dataset.dashboardWindow = "true";
+  document.querySelectorAll("main > section").forEach(section => {
+    section.hidden = section.id !== targetId;
+  });
+  const target = document.getElementById(targetId);
+  if (target && targetId !== "adminArea") target.hidden = false;
+  if (targetId === "adminArea" && target) target.hidden = true;
+  const brand = document.getElementById("brandLink");
+  if (brand) { brand.href = "?view=dashboard"; brand.target = "_blank"; }
+  const navActions = document.querySelector(".nav-actions");
+  if (navActions) navActions.innerHTML =
+    '<a class="btn ghost" href="?view=dashboard" target="_blank" rel="noopener">Dashboard ↗</a>' +
+    '<a class="btn primary" href="?view=submissions" target="_blank" rel="noopener">Submissions ↗</a>';
+})();
 document.getElementById("year").textContent = new Date().getFullYear();
 </script>
 <script type="module" src="./src/auth.js"></script>
