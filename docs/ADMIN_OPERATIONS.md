@@ -21,6 +21,7 @@
 
 - Artists start with 40 credits.
 - Every Monday at 00:05 Africa/Johannesburg time, the scheduled reset sets a non-admin artist's balance to exactly 40.
+- The reset locks each artist profile while it reconciles the ledger, serializing the reset against concurrent credit-charged submissions. A submission that waits for the reset spends from the new 40-credit balance.
 - One playlist submission, radio submission or integrated website-promotion submission costs one credit.
 - Admin submissions are unlimited.
 - Credit changes are recorded in the ledger; do not edit balances in the browser.
