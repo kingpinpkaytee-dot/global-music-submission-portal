@@ -1,67 +1,105 @@
-# Phase 4 — Supabase connection and authentication
+# Phase 4 — Supabase connection, migrations and authentication
 
-This phase prepares the static site to connect to Supabase Auth. It does not create a Supabase project or activate a production backend by itself.
+This runbook is for a **new Supabase environment** or a controlled rebuild. The existing Artist Frequency production project is already linked and migrations 0001–0013 are applied. Do not reapply migrations or create a second production project just to follow this guide.
 
-## 1. Create the Supabase project
+## 1. Create or select a Supabase project
 
-1. Sign in to the Supabase dashboard and create a project for Artist Frequency.
-2. Choose a strong database password and store it in a password manager.
-3. Wait until the database is provisioned.
-4. Open **Project Settings → API** (or the project's API keys page).
-5. Copy only the **Project URL** and the **publishable key** (or legacy anon/public key).
+1. Create a dedicated project for the intended environment.
+2. Store its database password in a password manager.
+3. Wait until database provisioning completes.
+4. Open the project API settings and copy the Project URL and publishable key (or legacy anon/public key).
 
-Never copy the `service_role` / secret key into the website, GitHub, chat, or any browser-visible file.
+Never place a service-role/secret key, database password or OAuth client secret in the browser, GitHub, chat, or `supabase-config.js`.
 
-## 2. Configure the website
+## 2. Configure the browser client
 
-Edit `supabase-config.js` in the repository:
-- Replace `https://YOUR-PROJECT.supabase.co` with the Project URL.
-- Replace `YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY` with the publishable/anon key.
+The browser config is `supabase-config.js`. It contains only the public Project URL and publishable key. For a separate staging project, use its own environment-specific values and avoid accidentally replacing production configuration.
 
-These are public client values. Do not put private keys in this file. Commit only after confirming that no service-role or database password is present.
+The site loads Supabase JS v2 from jsDelivr. `src/auth.js` contains email/password registration and sign-in plus the Google OAuth client flow. Provider availability is controlled by Supabase Auth settings.
 
-The site loads Supabase JS v2 from jsDelivr in `src/auth.js`. The sign-up, password sign-in and Google OAuth buttons use Supabase Auth. Email confirmation is expected when enabled in project settings.
+## 3. Link the Supabase CLI
 
-## 3. Configure Auth URLs
+From the repository root, authenticate and link the intended project:
 
-In **Authentication → URL Configuration**:
-- Set the Site URL to the actual hosted website origin.
-- Add the local development origin to Redirect URLs if local testing is required.
-- Add the production origin and any preview origin that will be used for OAuth callbacks.
+```powershell
+npx --yes supabase@latest login
+npx --yes supabase@latest link --project-ref YOUR_PROJECT_REF
+```
 
-Do not use a wildcard redirect in production unless there is a specific, reviewed need.
+Never paste access tokens, database passwords or privileged keys into source files or commit them.
 
-## 4. Apply database migrations
+## 4. Review and apply migrations
 
-Use the Supabase SQL Editor or Supabase CLI and apply migrations in numeric order:
-1. `supabase/migrations/0001_core_platform.sql`
-2. `supabase/migrations/0002_artist_frequency_features.sql`
-3. `supabase/migrations/0003_signup_and_public_stats_hardening.sql`
-4. `supabase/migrations/0004_submission_credits_and_verification.sql`
-5. `supabase/migrations/0005_campaign_and_admin_policy_fixes.sql`
+For a new environment, apply every migration in ascending numeric order:
 
-Apply first to a non-production project. Review SQL errors and inspect resulting tables, views, functions, triggers and RLS policies before using real artist data. Do not treat a committed migration as an applied migration.
+1. `0001_core_platform.sql`
+2. `0002_artist_frequency_features.sql`
+3. `0003_signup_and_public_stats_hardening.sql`
+4. `0004_submission_credits_and_verification.sql`
+5. `0005_campaign_and_admin_policy_fixes.sql`
+6. `0006_security_and_credit_hardening.sql`
+7. `0007_restrict_trigger_function_execution.sql`
+8. `0008_install_scheduler_jobs.sql`
+9. `0009_least_privilege_artist_finance.sql`
+10. `0010_least_privilege_view_grants.sql`
+11. `0011_harden_default_privileges.sql`
+12. `0012_serialize_weekly_credit_reset.sql`
+13. `0013_restrict_updated_at_trigger_execution.sql`
 
-## 5. Enable Google OAuth
+Review the pending migration list before any deployment:
 
-1. Create a Google OAuth client in Google Cloud Console.
-2. Configure the authorised redirect URI shown by the Supabase Google provider setup screen (the Supabase Auth callback URL).
-3. In Supabase **Authentication → Providers → Google**, enable Google and enter the OAuth client ID and secret directly in the dashboard.
-4. Save and test the callback using the configured site redirect URL.
+```powershell
+npx --yes supabase@latest db push --dry-run --remote
+```
 
-Keep the Google client secret in Supabase provider settings; never add it to GitHub or frontend JavaScript.
+Only apply migrations after confirming the linked project is the intended environment:
 
-## 6. Security and launch gates
+```powershell
+npx --yes supabase@latest db push --remote --yes
+```
 
-Before public launch:
-- Test sign-up, email confirmation, sign-in, sign-out, password recovery and Google OAuth.
-- Test RLS with two different artist accounts and an unauthenticated browser.
-- Confirm the verified admin email receives admin role only through the database trigger.
-- Confirm artists cannot change role, verification status, credit ledger entries or moderation decisions.
-- Configure abuse protection, rate limits, CAPTCHA where appropriate, backups, privacy/deletion workflows, Terms and content-rights policies.
-- Schedule the Monday 00:05 Africa/Johannesburg credit reset only after the migrations have been successfully applied and validated.
-- Configure the 24-hour Marketplace publisher only after moderation and scheduling have been tested.
+For the existing production project, the expected dry-run result is no unapplied migrations. Do not run destructive reset commands against production.
+
+## 5. Configure Supabase Auth
+
+In Supabase Authentication settings:
+- Enable email/password and configure email confirmation and password recovery.
+- Set the exact production Site URL.
+- Add only the necessary production and local development redirect URLs.
+- Enable Google only after creating a Google OAuth client and entering its client ID/secret directly in Supabase provider settings.
+- Use the exact callback URL Supabase displays for the Google provider. Do not use broad wildcard redirects in production.
+
+## 6. Protect the administrator
+
+The configured administrator role is assigned by a database trigger only after Supabase confirms the matching Auth email. A user cannot grant themselves admin access through profile metadata or the browser.
+
+Enable MFA for the administrator and protect recovery methods. Never place administrator credentials or privileged server keys in frontend code.
+
+## 7. Verify production configuration
+
+Use read-only SQL checks to confirm:
+- 11 public tables have RLS enabled.
+- The expected RLS policies are present.
+- Anonymous access is limited to intended public read-only surfaces.
+- Artists can access only their own private records, subject to the RLS policies.
+- The weekly reset function is executable by the trusted scheduler role but not anon/authenticated.
+- The weekly reset cron job is active at Sunday 22:05 UTC (Monday 00:05 SAST).
+- The Marketplace publisher job is active every five minutes.
+- Public statistics and Marketplace views expose only intended public information.
+
+Do not manually run `run_weekly_credit_reset()` on production as a test. It changes real artist balances. Verify scheduler registration and function permissions without invoking the routine.
+
+## 8. Pre-launch security and product gates
+
+- Test sign-up, email confirmation, sign-in, sign-out, password recovery and configured OAuth callbacks.
+- Test RLS with separate anonymous, artist A, artist B and admin sessions.
+- Confirm artists cannot edit privileged profile fields, other artists' records, credit entries or moderation decisions.
+- Verify the protected submission RPC rejects inactive/unverified destinations and insufficient balances.
+- Configure abuse controls, rate limits, CAPTCHA as appropriate, backups, account deletion and data retention.
+- Configure the official Artist Frequency Spotify playlist and trusted verification process before enabling playlist-follow verification.
+- Populate opportunity directories only with verified, active and permission-appropriate entries.
+- Publish privacy, terms, content-rights and moderation policies.
 
 ## Current boundary
 
-The repository now contains the browser Auth integration scaffold and this setup runbook. Until a Supabase project URL/key are supplied and configured, the page deliberately reports that Auth is not configured. Database migrations remain unapplied, so submissions, credits, public counters, campaigns and Marketplace workflows are not live.
+The Supabase production schema, least-privilege grants, RLS policies, credit submission RPC, weekly reset routine, Marketplace publisher and cron registrations are deployed. The public website is still a frontend preview; account workflows, artist dashboards, submissions, campaigns, Marketplace and administrative tools must be wired to the backend and validated before a public launch.

@@ -20,7 +20,7 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 ## Production status — 9 November 2026
 
-The Supabase production project is linked and migrations **0001–0012** are applied.
+The Supabase production project is linked and migrations **0001–0013** are applied.
 
 - **11/11 public tables have RLS enabled.**
 - **20 RLS policies** are installed.
@@ -51,6 +51,7 @@ Spotify popularity data is not fabricated or scraped. Popularity sync requires a
 - `supabase/migrations/0010_least_privilege_view_grants.sql` — explicit read-only grants for public views and authenticated-only credit balances.
 - `supabase/migrations/0011_harden_default_privileges.sql` — least-privilege defaults for future tables, views, sequences and functions.
 - `supabase/migrations/0012_serialize_weekly_credit_reset.sql` — per-artist locking to serialize weekly resets against credit-charged submissions.
+- `supabase/migrations/0013_restrict_updated_at_trigger_execution.sql` — removes direct browser-role execution of the updated-at trigger helper.
 - `src/auth.js` — Supabase JS v2 email registration, password sign-in and Google OAuth client.
 - `supabase-config.js` — public Supabase URL and publishable key only; never place a service-role key here.
 - `docs/PLATFORM_ARCHITECTURE.md` — backend and security architecture.
@@ -59,7 +60,7 @@ Spotify popularity data is not fabricated or scraped. Popularity sync requires a
 
 ## Setup and operational requirements
 
-For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0012 applied.
+For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0013 applied.
 
 - Enable and verify email/password and Google OAuth providers; configure the Google Cloud OAuth client and Supabase redirect allowlist.
 - Keep service-role keys, database passwords and OAuth client secrets server-side. The browser may use only the publishable/anon key.

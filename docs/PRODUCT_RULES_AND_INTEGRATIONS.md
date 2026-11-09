@@ -2,63 +2,86 @@
 
 ## Confirmed product rules
 
-- Free artist accounts.
-- Every artist receives 40 credits on registration.
-- Credits reset to exactly 40 every Monday at 00:05, Africa/Johannesburg time. This naturally occurs four or five times per calendar month. Unused credits do not roll over.
-- One playlist submission costs 1 credit.
-- One radio-station submission costs 1 credit.
-- One website-promotion submission costs 1 credit, but only when that destination is integrated and accepting submissions.
-- Admin account: `kingpinpkaytee@gmail.com`; admin has unlimited submission credits and does not need a balance.
-- Artists can add a Spotify Artist URL and provide supplementary profile information through a form.
-- Verification is earned by following the official Artist Frequency Spotify playlist. The follow must be verified by an authorised admin or a trusted Spotify integration; never award the badge solely because an artist checks a box.
-- Public site statistics must be database-backed counts of registered public artists, platforms, curators, radio stations and bloggers.
-- Shared marketplace tracks require admin approval. Once approved, they are scheduled to appear 24 hours later.
-- Published marketplace tracks are automatically promoted in the Artist Frequency on-site marketplace. This does not imply paid advertising or promotion on external services.
-- Marketplace weekly Top 5 is an admin-curated editorial feature; no fake popularity ranking is generated.
+- Free individual artist accounts.
+- Each non-admin artist receives 40 free credits on registration.
+- Credits reset to exactly 40 every Monday at 00:05, Africa/Johannesburg time. There are four or five reset Mondays in each calendar month. Unused credits do not roll over.
+- A playlist submission costs 1 credit.
+- A radio-station submission costs 1 credit.
+- A website-promotion submission costs 1 credit only when the destination is verified, active, integrated and accepting submissions.
+- Admin account: `kingpinpkaytee@gmail.com`. The verified admin has unlimited submissions.
+- Artists provide a Spotify Artist URL and supplementary profile details.
+- Verification requires an authorised admin or trusted integration to confirm the artist follows the official Artist Frequency Spotify playlist. A checkbox alone never awards a badge.
+- Public statistics are real database counts of public artists and verified, active directory entries.
+- Marketplace tracks require admin approval and publish 24 hours later.
+- Automatic Marketplace promotion means internal placement on the Artist Frequency website only.
+- Weekly Marketplace Top 5 is an admin-curated editorial selection, not a fabricated popularity ranking.
+- Artists may create campaign briefs describing desired promotion. A brief is a request, not a guarantee of placements.
 
-## Sign-in providers
+## Artist accounts and identity
 
-Email/password registration and Google sign-in are intended through Supabase Auth. Google OAuth must be enabled in the Supabase dashboard and configured in Google Cloud Console with the exact redirect URI provided by Supabase. Add authorised site URLs and redirect URLs in Supabase Auth settings. No OAuth secret belongs in frontend code or Git.
+Supabase Auth provides email/password registration and sign-in. The browser contains a Google OAuth flow, but the Google provider and exact redirect allowlist must be enabled in Supabase before Google sign-in is offered as an active method.
 
-The admin address is recorded as configuration. The database trigger assigns the admin role only when Supabase reports that this email is confirmed. For stronger production governance, require MFA for the admin account and keep recovery methods current.
+A database trigger creates each artist profile. The admin role is assigned only when Supabase confirms the configured admin email. Never trust user-editable metadata to grant admin privileges.
 
-## Artist information form
+Profile fields include artist/display name, country, biography, Spotify Artist URL, website and social links. Public profile information must be clearly separated from private account/contact information.
 
-The Spotify artist URL is only one input; it cannot supply all artist information. The profile form should ask for artist/display name, country, biography, genres, language, website/social links, contact email (private by default), artist image, and optional press-kit URL. Clearly distinguish public profile fields from private account/contact fields.
+## Spotify popularity
 
-## Spotify popularity score
+Show a Spotify popularity value only when an authorised Spotify API integration returns that value for the artist. API access and returned fields depend on Spotify's current product and access rules. Do not scrape Spotify pages, infer a Spotify popularity score from follower counts, or invent missing values. Show "Not available" until an approved sync succeeds.
 
-The artist dashboard can display the Spotify popularity value only if the configured Spotify API access returns that field for the artist and the application is authorised to use it. API access, product rules and field availability can change. Do not scrape Spotify pages, infer a score from follower counts, or invent missing values. Keep the raw Spotify field nullable and show “Not available” until a verified API sync succeeds. A separate Artist Frequency engagement score can be introduced later, but it must be labelled as the platform's own score and its formula disclosed.
+A separate Artist Frequency engagement score may be introduced later, but it must be labelled as the platform's own metric and its calculation disclosed.
+
+## Credit and submission workflow
+
+The signed credit ledger is the source of truth. Clients cannot directly write ledger records or submit credit-charged opportunities by inserting rows.
+
+The protected `submit_artist_opportunity` RPC:
+1. Requires a signed-in artist.
+2. Validates required text fields, URL scheme, submission type and target.
+3. Confirms the destination is verified, public, active and accepting submissions.
+4. Locks the artist profile to serialize concurrent submissions.
+5. Checks the current ledger balance for non-admin users.
+6. Creates a pending submission and records the one-credit debit atomically.
+
+Admin accounts bypass the balance check and debit.
+
+The scheduled reset uses the same profile-row lock as the submission RPC, then reconciles the ledger to exactly 40 credits. A reset-run marker makes the operation idempotent for each artist and South African calendar week. The reset is scheduled at Sunday 22:05 UTC, equivalent to Monday 00:05 SAST. Never invoke the reset manually against real production balances as a test.
+
+## Directories and matching
+
+Directory categories include platforms, curators, playlists, radio stations, websites and bloggers. Public clients should see only entries marked public, active and verified. Recommendations should prioritise an artist's home country, then broaden by compatible genres and territories.
+
+Only destinations that are genuinely integrated and accepting submissions may be selected for a charged submission. Do not publish fabricated contacts, approvals or opportunities.
 
 ## Marketplace lifecycle
 
-1. Artist submits a public DSP link and optional artwork/description.
-2. Track enters pending moderation and is not public.
-3. Admin approves or declines.
-4. Approval schedules publication for 24 hours later.
-5. A scheduled backend job publishes due tracks and adds them to the on-site promoted marketplace feed.
-6. Admin selects up to five eligible tracks for the weekly Top 5.
+1. An authenticated artist shares a public DSP link and optional artwork/description.
+2. The track is stored as pending and remains private.
+3. An authorised admin reviews it through the protected moderation RPC.
+4. Approval schedules publication 24 hours later.
+5. A scheduled backend job publishes due tracks and records an internal promotion event.
+6. An authorised editor selects up to five eligible published tracks for the weekly feature.
 
-Automatic promotion currently means placement in the website's own marketplace feed. Social posts, paid ads, third-party playlist additions and external DSP actions require separate integrations, credentials, policies and explicit artist consent.
+External ads, social posts, third-party playlist additions and external DSP promotion require separate integrations, artist consent and policy review.
 
 ## Campaign builder
 
-Artists can specify their campaign goal, preferred channels (playlist, radio, blogs, website feature), target countries, target genres, campaign brief and timing. Campaign requests are reviewed by the platform; campaign creation does not guarantee placements.
+Artists may describe their goals, preferred channels, target countries, genres, timing and campaign brief. Campaign creation does not guarantee placement or results. Staff must confirm actual integrated opportunities before any campaign is represented as active.
 
-## Live backend deployment checklist
+## Production deployment status — 9 November 2026
 
-- Apply migrations in order: 0001, then 0002.
-- Configure Supabase Auth email verification, password recovery and Google OAuth.
-- Set Site URL and allowed redirect URLs.
-- Configure MFA for admin.
-- Deploy trusted Edge Functions for credit-checked submissions, Google/Spotify OAuth callbacks as needed, admin moderation and metadata sync.
-- Schedule weekly credit reset every Monday at 00:05 Africa/Johannesburg.
-- Schedule marketplace publication worker every five minutes.
-- Test RLS using anonymous, artist A, artist B and admin accounts.
-- Verify public counts are sourced from approved/public records.
-- Add privacy policy, terms, moderation policy and content rights declaration.
-- Store all privileged secrets in Supabase/Vercel server-side secret stores only.
+The Supabase production project is linked and migrations 0001–0013 are applied. The database has 11 public tables with RLS enabled and 20 RLS policies. Table/view grants use least privilege; default privileges for future public objects are hardened; privileged functions have explicit execution grants.
 
-## Implementation status
+The weekly credit reset and five-minute Marketplace publisher cron jobs are active. Marketplace publishing has successful recorded runs. The weekly reset is registered for Monday 00:05 SAST; its first scheduled execution after deployment must be confirmed from cron history.
 
-The migration defines the data model, row-level security foundations, admin checks, credit-reset function, moderation scheduling and public views. It is not live until applied to a Supabase project, Google OAuth is configured, and trusted scheduled backend functions are deployed. The static site must be connected to these services before any account, score, credit, verification or public counter is represented as live.
+The production database and backend routines are deployed, but the website is still a frontend preview. Some forms currently save to browser localStorage, and the artist dashboard, directory discovery, credit display, submission workflow, campaign workflow, Marketplace and admin tools still need full live-backend integration.
+
+## Remaining integration gates
+
+- Confirm email confirmation/password recovery configuration and Google OAuth provider settings.
+- Complete and validate authenticated frontend workflows.
+- Build protected admin tools for directory management, campaign review and weekly Top 5 selection.
+- Configure the official Spotify playlist URL/ID and trusted follow-verification process before enabling badges.
+- Integrate Spotify API access only when approved and available.
+- Add rate limits, abuse controls, account deletion, retention procedures and audit review.
+- Publish privacy, Terms, content-rights and moderation policies before public launch.
