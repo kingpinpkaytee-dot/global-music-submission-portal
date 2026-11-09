@@ -44,8 +44,10 @@ function categoryEvidence(category,title,snippet,html,url){
   const all=(title+" "+snippet+" "+html.slice(0,80000)).toLowerCase();
   const submit=/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here)/i.test(all);
   if(!submit) return {ok:false,reason:"No explicit music-submission evidence found"};
+  const route=/<form\b|mailto:|href\s*=\s*["'][^"']*(submit|submission|demo|upload)[^"']*["']/i.test(html) || /\/(submit|submission|demo|music-upload)/i.test(url);
+  if(!route) return {ok:false,reason:"No direct submission form or route found"};
   if(category==="playlist"){
-    const spotify=html.match(/https?:\\?\/\\?\/open\.spotify\.com\\?\/playlist\\?\/[A-Za-z0-9]+/i);
+    const spotify=html.match(/https?:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/i) || html.match(/https?:\\\/\\\/open\.spotify\.com\\\/playlist\\\/([A-Za-z0-9]+)/i);
     if(!spotify) return {ok:false,reason:"No individual Spotify playlist URL found on source page"};
     return {ok:true,spotifyUrl:spotify[0].replace(/\\/g,"")};
   }
@@ -55,7 +57,7 @@ function categoryEvidence(category,title,snippet,html,url){
   return {ok:true};
 }
 async function main(){
-  const run=await rest("opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
+  const run=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
   const runId=run[0].id;let seen=0,added=0,updated=0,rejected=0,done=0;const errors=[];
   for(const item of queries){
     try{
@@ -69,15 +71,15 @@ async function main(){
         const candidate={run_id:runId,category:item.category,name,destination_url:checked.finalUrl||url,
           submission_url:checked.ok?checked.finalUrl:null,evidence:(hit.snippet||"").slice(0,1800),
           verification_status:ev.ok?"verified":"rejected",verification_reason:ev.ok?"Reachable official source and submission evidence":ev.reason};
-        await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},body:JSON.stringify(candidate)});
+        await rest("hourly_opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},body:JSON.stringify(candidate)});
         if(!ev.ok){rejected++;continue;}
         const record={category:item.category,name,website_url:checked.finalUrl||url,
           submission_url:checked.finalUrl||url,genres:[],is_verified:true,is_active:true,is_public:true,
           verification_evidence_url:checked.finalUrl||url,verified_at:new Date().toISOString(),
-          source_name:"Google Custom Search",source_url:url,submission_method:"external_form",
-          accepts_free_submissions:false,activity_status:"active",first_seen_at:new Date().toISOString(),
+          source_name:"Google Custom Search",source_url:url,submission_method:"form",
+          accepts_free_submissions:/free (submission|to submit|music submissions)|no fee/i.test(checked.html||""),activity_status:"active",first_seen_at:new Date().toISOString(),
           last_checked_at:new Date().toISOString(),source_evidence_url:url,data_confidence:"source_confirmed",
-          is_integrated:false,accepts_submissions:true};
+          is_integrated:false,accepts_submissions:false};
         if(item.category==="playlist") {
           record.website_url=ev.spotifyUrl;record.dsp_name="Spotify";
           record.submission_url=checked.finalUrl||url;record.accepts_free_submissions=/free submission|free to submit|no fee/i.test(checked.html||"");
@@ -93,7 +95,7 @@ async function main(){
     await sleep(350);
   }
   const status=errors.length?(done?"partial":"failed"):"completed";
-  await rest(`opportunity_discovery_runs?id=eq.${runId}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({finished_at:new Date().toISOString(),status,searches_run:done,candidates_seen:seen,records_added:added,records_updated:updated,records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
+  await rest(`hourly_opportunity_discovery_runs?id=eq.${runId}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({finished_at:new Date().toISOString(),status,searches_run:done,candidates_seen:seen,records_added:added,records_updated:updated,records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
   console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,recordsAdded:added,recordsUpdated:updated,recordsRejected:rejected,errors},null,2));
   if(!done) process.exitCode=1;
 }
