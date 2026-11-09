@@ -235,19 +235,24 @@ async function loadPublicStats() {
 
 async function loadMarketplacePublic() {
   if (!supabase) return;
-  const [topResult, tracksResult] = await Promise.all([
-    supabase.from("public_marketplace_top5")
-      .select("rank,id,track_title,artist_display_name,track_url,artwork_url,genre,country,published_at")
-      .order("rank", { ascending: true }),
-    supabase.from("public_marketplace_tracks")
+  const topPromise = supabase.from("public_marketplace_top5")
+    .select("rank,id,track_title,artist_display_name,track_url,artwork_url,genre,country,published_at")
+    .order("rank", { ascending: true });
+  const pageSize = 500;
+  const allTracks = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await supabase.from("public_marketplace_tracks")
       .select("id,track_title,artist_display_name,track_url,artwork_url,genre,country,description,published_at,is_promoted")
       .order("published_at", { ascending: false })
-      .limit(30)
-  ]);
+      .range(offset, offset + pageSize - 1);
+    if (page.error) throw page.error;
+    allTracks.push(...(page.data || []));
+    if (!page.data || page.data.length < pageSize) break;
+  }
+  const topResult = await topPromise;
   if (topResult.error) throw topResult.error;
-  if (tracksResult.error) throw tracksResult.error;
   renderTopFive(topResult.data || []);
-  renderPublishedMarketplace(tracksResult.data || []);
+  renderPublishedMarketplace(allTracks);
 }
 
 function renderTopFive(items) {
