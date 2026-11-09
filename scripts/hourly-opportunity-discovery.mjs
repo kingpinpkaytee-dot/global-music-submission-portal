@@ -39,7 +39,7 @@ async function inspect(url) {
     return {ok:true,finalUrl:r.url,html:text};
   } catch(e) { return {ok:false,reason:String(e.message||e)}; }
 }
-function cleanName(s){return String(s||"").replace(/\s+/g," ").replace(/[|<>]/g,"").trim().slice(0,180);}
+function cleanName(s){return String(s||"").replace(/\s+/g," ").replace(/[|<>]/g,"").trim().slice(0,160);}
 function categoryEvidence(category,title,snippet,html,url){
   const all=(title+" "+snippet+" "+html.slice(0,80000)).toLowerCase();
   const submit=/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here)/i.test(all);
@@ -67,7 +67,7 @@ async function main(){
         const checked=await inspect(url);
         let ev={ok:false,reason:checked.reason||"Unreachable"};
         if(checked.ok) ev=categoryEvidence(item.category,hit.title||"",hit.snippet||"",checked.html||"",checked.finalUrl||url);
-        const name=cleanName(hit.title);
+        const name=cleanName(hit.title);if(!name){rejected++;continue;}
         const candidate={run_id:runId,category:item.category,name,destination_url:checked.finalUrl||url,
           submission_url:checked.ok?checked.finalUrl:null,evidence:(hit.snippet||"").slice(0,1800),
           verification_status:ev.ok?"verified":"rejected",verification_reason:ev.ok?"Reachable official source and submission evidence":ev.reason};
