@@ -48,7 +48,7 @@ Connected frontend flows include:
 
 Google OAuth still requires its provider and redirect URL to be configured in Supabase Auth. The browser code includes the OAuth flow, but availability must be confirmed in the Supabase dashboard. Spotify popularity is shown only from the dedicated `spotify_popularity` API field; no scraped or invented score is used. Playlist-follow verification remains disabled until the official playlist URL/ID and trusted verification process are configured.
 
-The frontend has passed JavaScript ES-module syntax checks and a static DOM-binding check. A full browser sign-up/sign-in and end-to-end artist/admin workflow still needs to be exercised in the hosted site with separate test accounts. The repository source is not itself a hosting deployment; configure and publish the static site over HTTPS before inviting artists.
+The frontend has passed JavaScript ES-module syntax checks and a static DOM-binding check. A Vercel project now hosts a protected preview built from the latest committed files; HTTP checks returned 200 for the page and all four JavaScript/config assets. Full browser sign-up/sign-in and end-to-end artist/admin workflows still need to be exercised with separate test accounts. No public production launch has been approved.
 
 ## Repository contents
 
@@ -74,6 +74,7 @@ The frontend has passed JavaScript ES-module syntax checks and a static DOM-bind
 - `docs/PLATFORM_ARCHITECTURE.md` — backend and security architecture.
 - `docs/PRODUCT_RULES_AND_INTEGRATIONS.md` — confirmed rules and integration requirements.
 - `docs/PHASE_4_SUPABASE_SETUP.md` — setup guidance for a new Supabase environment.
+- `docs/VERCEL_DEPLOYMENT.md` — Vercel project, protected preview and production-pause status.
 
 ## Setup and operational requirements
 
@@ -89,9 +90,13 @@ For a **new** Supabase environment, apply migrations in numeric order and then v
 - Complete protected admin tools for directory management, campaign review and weekly Top 5 selection.
 - Publish privacy, terms, content-rights and moderation policies before public launch.
 
+## Vercel hosting state
+
+The `artist-frequency` Vercel project has a READY protected preview deployment. The project is paused for production traffic: an initial upload was inferred as a production target from its `main` metadata, so the production alias was blocked rather than released. The preview deployment has no production target. Vercel automatic GitHub deployments remain pending a GitHub Login Connection under Vercel account Settings → Authentication. Do not unpause production until hosted-browser validation is complete and production release is authorised.
+
 ## Further documentation
 
-See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md` and `docs/ADMIN_OPERATIONS.md`.
+See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md`, `docs/ADMIN_OPERATIONS.md` and `docs/VERCEL_DEPLOYMENT.md`.
 
 **Artist Frequency**  
 *Music. Passion. Legacy.*
