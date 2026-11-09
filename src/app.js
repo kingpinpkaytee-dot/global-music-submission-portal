@@ -180,7 +180,7 @@ async function updateOpportunityStats() {
   const values = await Promise.all(requests);
   values.forEach(([id, value]) => {
     const element = byId(id);
-    if (element) element.textContent = Number(value).toLocaleString();
+    if (element) element.textContent = Number(value).toLocaleString() + (Number(value) > 0 ? "+" : "");
   });
 }
 async function loadDirectory() {
@@ -217,7 +217,7 @@ async function loadPublicStats() {
   };
   Object.entries(values).forEach(([id, value]) => {
     const element = byId(id);
-    if (element) element.textContent = Number(value ?? 0).toLocaleString();
+    if (element) element.textContent = Number(value ?? 0).toLocaleString() + (Number(value ?? 0) > 0 ? "+" : "");
   });
   const status = byId("publicStatsStatus");
   if (status) status.textContent = "Artist total from the public artist register; opportunity totals count verified, active and public directory records only.";
