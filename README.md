@@ -20,7 +20,7 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 ## Production status — 9 November 2026
 
-The Supabase production project is linked and migrations **0001–0011** are applied.
+The Supabase production project is linked and migrations **0001–0012** are applied.
 
 - **11/11 public tables have RLS enabled.**
 - **20 RLS policies** are installed.
@@ -29,6 +29,7 @@ The Supabase production project is linked and migrations **0001–0011** are app
 - The weekly reset job is scheduled for Monday 00:05 South African time (Sunday 22:05 UTC).
 - The Marketplace publisher job runs every five minutes. Its production scheduler job has completed successfully in a recorded run.
 - The registration/profile trigger and credit ledger rules are deployed. The protected submission RPC validates integrated destinations and deducts credits atomically.
+- Weekly resets take the same per-artist profile-row lock as credit-charged submissions, so a submission racing the Monday reset cannot leave an off-by-one balance.
 - No production balances or artist records were changed by the permissions migrations.
 
 The website is still a **frontend preview with an authentication integration scaffold**, not a finished production application. The Supabase JS client includes email/password and Google OAuth flows, but provider settings and redirect URLs must be confirmed before sign-in is exposed. Dashboard, submission, campaign, moderation and directory screens still need full frontend wiring to the deployed backend.
@@ -49,6 +50,7 @@ Spotify popularity data is not fabricated or scraped. Popularity sync requires a
 - `supabase/migrations/0009_least_privilege_artist_finance.sql` — least-privilege table grants.
 - `supabase/migrations/0010_least_privilege_view_grants.sql` — explicit read-only grants for public views and authenticated-only credit balances.
 - `supabase/migrations/0011_harden_default_privileges.sql` — least-privilege defaults for future tables, views, sequences and functions.
+- `supabase/migrations/0012_serialize_weekly_credit_reset.sql` — per-artist locking to serialize weekly resets against credit-charged submissions.
 - `src/auth.js` — Supabase JS v2 email registration, password sign-in and Google OAuth client.
 - `supabase-config.js` — public Supabase URL and publishable key only; never place a service-role key here.
 - `docs/PLATFORM_ARCHITECTURE.md` — backend and security architecture.
@@ -57,7 +59,7 @@ Spotify popularity data is not fabricated or scraped. Popularity sync requires a
 
 ## Setup and operational requirements
 
-For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0011 applied.
+For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0012 applied.
 
 - Enable and verify email/password and Google OAuth providers; configure the Google Cloud OAuth client and Supabase redirect allowlist.
 - Keep service-role keys, database passwords and OAuth client secrets server-side. The browser may use only the publishable/anon key.
