@@ -127,11 +127,21 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
     if (item.curator_interaction_score !== null && item.curator_interaction_score !== undefined) tagValues.push("Measured interaction " + Number(item.curator_interaction_score).toFixed(1) + "/100");
     const tags = tagValues.map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join("");
     const link = safeHttpUrl(item.submission_url || item.website_url);
-    const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">View destination ↗</a></p>' : "";
     const submissionStatus = item.is_integrated && item.accepts_submissions
       ? "In-platform submissions open"
       : "External directory listing · in-platform submissions not enabled";
-    return '<article class="opportunity"><div class="award"><span class="award-mark">🏆</span> VERIFIED & APPROVED</div><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + linkHtml + '</article>';
+    const curatorProfile = safeHttpUrl(item.curator_profile_url);
+    const curatorLabel = escapeHtml(item.curator_name || "Independent curator");
+    const curatorHtml = '<p class="form-note">Curator: ' + (curatorProfile
+      ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(curatorProfile) + '">' + curatorLabel + ' ↗</a>'
+      : curatorLabel) + '</p>';
+    const spotifyPlaylist = item.category === "playlist" ? safeHttpUrl(item.website_url) : null;
+    const spotifyLinkHtml = spotifyPlaylist
+      ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(spotifyPlaylist) + '">Open Spotify playlist ↗</a></p>'
+      : "";
+    const linkLabel = item.category === "playlist" ? "Submit track ↗" : "View destination ↗";
+    const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">' + linkLabel + '</a></p>' : "";
+    return '<article class="opportunity"><div class="award"><span class="award-mark">🏆</span> VERIFIED & APPROVED</div><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + curatorHtml + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + spotifyLinkHtml + linkHtml + '</article>';
   }).join("");
 }
 
@@ -187,7 +197,7 @@ async function loadDirectory() {
   if (!supabase) return;
   const { data, error } = await supabase
     .from("opportunity_directories")
-    .select("id,category,name,country,website_url,submission_url,genres,is_integrated,accepts_submissions,accepts_free_submissions,activity_status,follower_count,approval_rate,response_rate,curator_interaction_score,last_checked_at,source_url,source_evidence_url,data_confidence")
+    .select("id,category,name,country,website_url,submission_url,curator_name,curator_profile_url,genres,is_integrated,accepts_submissions,accepts_free_submissions,activity_status,follower_count,approval_rate,response_rate,curator_interaction_score,last_checked_at,source_url,source_evidence_url,data_confidence")
     .eq("is_public", true)
     .eq("is_active", true)
     .eq("is_verified", true)
