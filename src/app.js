@@ -1,6 +1,27 @@
-﻿import { supabase, isSupabaseConfigured } from "./supabase-client.js";
+import { supabase, isSupabaseConfigured } from "./supabase-client.js";
 
 window.artistFrequencyBackendActive = true;
+
+// Keep all task and opportunity links inside one reusable popup window.
+// The opener is detached immediately to prevent reverse-tab navigation.
+document.addEventListener("click", event => {
+  const anchor = event.target.closest("a[href]");
+  if (!anchor) return;
+  const raw = anchor.getAttribute("href") || "";
+  if (!raw || raw.startsWith("#") || raw.startsWith("mailto:") || raw.startsWith("tel:")) return;
+  const isNewWindow = anchor.target === "_blank" || anchor.target === "artistFrequencyPopup";
+  if (!isNewWindow) return;
+  let destination;
+  try { destination = new URL(raw, window.location.href); } catch { return; }
+  if (!["http:", "https:"].includes(destination.protocol)) return;
+  event.preventDefault();
+  const popup = window.open(destination.href, "ArtistFrequencyPopup", "popup=yes,width=1180,height=850,resizable=yes,scrollbars=yes");
+  if (popup) {
+    try { popup.opener = null; popup.focus(); } catch {}
+  } else {
+    window.location.href = destination.href;
+  }
+}, true);
 
 const byId = id => document.getElementById(id);
 let currentUser = null;
@@ -134,6 +155,34 @@ function populateSubmissionTargets() {
   }
 }
 
+async function updateOpportunityStats() {
+  const categories = {
+    publicPlaylists: "playlist",
+    publicCurators: "curator",
+    publicRadio: "radio_station",
+    publicBloggers: "blogger",
+    publicPlatforms: "platform",
+    publicWebsites: "website"
+  };
+  const baseCount = () => supabase.from("opportunity_directories")
+    .select("id", { count: "exact", head: true })
+    .eq("is_public", true).eq("is_active", true).eq("is_verified", true);
+  const requests = Object.entries(categories).map(async ([id, category]) => {
+    const { count, error } = await baseCount().eq("category", category);
+    if (error) throw error;
+    return [id, count || 0];
+  });
+  requests.push((async () => {
+    const { count, error } = await baseCount();
+    if (error) throw error;
+    return ["publicOpportunityTotal", count || 0];
+  })());
+  const values = await Promise.all(requests);
+  values.forEach(([id, value]) => {
+    const element = byId(id);
+    if (element) element.textContent = Number(value).toLocaleString();
+  });
+}
 async function loadDirectory() {
   if (!supabase) return;
   const { data, error } = await supabase
@@ -145,8 +194,14 @@ async function loadDirectory() {
     .order("name", { ascending: true });
   if (error) throw error;
   directoryRecords = data || [];
+
   renderOpportunityCards(currentOpportunityFilter);
   populateSubmissionTargets();
+  updateOpportunityStats().catch(error => {
+    console.error("Could not refresh verified opportunity totals:", error);
+    const status = byId("publicStatsStatus");
+    if (status) status.textContent = "Verified opportunity totals could not be refreshed. Please retry shortly.";
+  });
 }
 
 async function loadPublicStats() {
@@ -158,18 +213,14 @@ async function loadPublicStats() {
   if (error) throw error;
   if (!data) return;
   const values = {
-    publicArtists: data.registered_artists,
-    publicPlatforms: data.platforms,
-    publicCurators: data.curators,
-    publicRadio: data.radio_stations,
-    publicBloggers: data.bloggers
+    publicArtists: data.registered_artists
   };
   Object.entries(values).forEach(([id, value]) => {
     const element = byId(id);
     if (element) element.textContent = Number(value ?? 0).toLocaleString();
   });
   const status = byId("publicStatsStatus");
-  if (status) status.textContent = "Live counts from the Artist Frequency database.";
+  if (status) status.textContent = "Artist total from the public artist register; opportunity totals count verified, active and public directory records only.";
 }
 
 async function loadMarketplacePublic() {
@@ -370,6 +421,11 @@ async function submitDirectoryOpportunity() {
   if (error) throw error;
   byId("submissionForm").reset();
   populateSubmissionTargets();
+  updateOpportunityStats().catch(error => {
+    console.error("Could not refresh verified opportunity totals:", error);
+    const status = byId("publicStatsStatus");
+    if (status) status.textContent = "Verified opportunity totals could not be refreshed. Please retry shortly.";
+  });
   setMessage("formResult", "Submission received. One credit was charged for the verified destination.");
   await Promise.all([loadArtistSubmissions(), loadCreditBalance()]);
 }
