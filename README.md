@@ -52,7 +52,7 @@ No public verified directory entries are currently populated. Directory entries 
 
 Google OAuth still requires its provider and redirect URL to be configured in Supabase Auth. The browser code includes the OAuth flow, but availability must be confirmed in the Supabase dashboard. Spotify popularity is shown only from the dedicated `spotify_popularity` API field; no scraped or invented score is used. Playlist-follow verification remains disabled until the official playlist URL/ID and trusted verification process are configured.
 
-The frontend has passed JavaScript ES-module syntax checks and a static DOM-binding check. A Vercel project now hosts a protected preview built from the latest committed files; HTTP checks returned 200 for the page and all four JavaScript/config assets. Full browser sign-up/sign-in and end-to-end artist/admin workflows still need to be exercised with separate test accounts. No public production launch has been approved.
+The frontend has passed JavaScript ES-module syntax checks and a static DOM-binding check. The isolated Vercel project `artist-frequency-preview` now hosts the latest committed source; HTTP checks returned 200 for the page and all four JavaScript/config assets, including the new directory admin screen. The preview is SSO-protected. Full browser sign-up/sign-in and end-to-end artist/admin workflows still need to be exercised with separate test accounts. No public production launch has been approved.
 
 ## Repository contents
 
@@ -97,7 +97,7 @@ For a **new** Supabase environment, apply migrations in numeric order and then v
 
 ## Vercel hosting state
 
-The `artist-frequency` Vercel project has a READY protected preview deployment. The project is paused for production traffic: an initial upload was inferred as a production target from its `main` metadata, so the production alias was blocked rather than released. The preview deployment has no production target. Vercel automatic GitHub deployments remain pending a GitHub Login Connection under Vercel account Settings → Authentication. Do not unpause production until hosted-browser validation is complete and production release is authorised.
+The canonical `artist-frequency` Vercel project remains paused, so its production domain cannot serve an untested release. The latest code is available in a separate SSO-protected project named `artist-frequency-preview` (`artist-frequency-preview-qvxljsysr.vercel.app`). Vercel reports that deployment as the Production target within this isolated preview-named project; it is not the canonical production site. Vercel automatic GitHub deployments remain pending a GitHub Login Connection under Vercel account Settings → Authentication. Do not unpause the canonical project or assign its production domain until hosted-browser validation is complete and production release is authorised.
 
 ## Further documentation
 
