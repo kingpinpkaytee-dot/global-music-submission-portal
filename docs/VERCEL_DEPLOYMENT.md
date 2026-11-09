@@ -15,21 +15,23 @@ The canonical project was paused after an upload was incorrectly inferred as a p
 
 - Project: `artist-frequency-preview`.
 - Project ID: `prj_3kGRczydXhC2ZgoWV5uQbTjDckZ9`.
-- Deployment ID: `dpl_GZjjgrfFC451k2AM2wNGvH6pLUFe`.
-- Deployment URL: `https://artist-frequency-preview-qvxljsysr.vercel.app`.
+- Latest source commit: `2e72b73bb6f61e985bbec99ed94bb3874e129f78` — dedicated Dashboard workspace windows.
+- Latest deployment ID: `dpl_F2WfnCRdispgssA2KCKR4jUNZPGY`.
+- Latest deployment URL: `https://artist-frequency-preview-rklwh91n4.vercel.app`.
 - State: READY.
-- Vercel deployment target reported by the API: `production` **within the isolated project named `artist-frequency-preview`**. This is not the canonical `artist-frequency` project or its production domain.
+- Vercel deployment target reported by the API: `null` (the deployment was created without a production/staging target and has no assigned aliases).
 - SSO protection is enabled for all deployments in the preview project.
-- A time-limited share link was created for review. Do not store the share token in Git; it expires on 10 November 2026.
+- A time-limited share link was created for review. Do not store the share token in Git; Vercel reported expiry on 10 November 2026.
 
 Read-only HTTP checks returned status 200 for:
 - The page root (`/`).
+- All nine Dashboard query routes: `?view=dashboard`, `submissions`, `discover`, `marketplace`, `campaigns`, `profile`, `account`, `stats` and `admin`.
 - `/src/supabase-client.js`
 - `/src/auth.js`
 - `/src/app.js`
 - `/supabase-config.js`
 
-The root page includes the new protected directory-management section. HTTP checks verify that files are being served; they do not prove end-to-end browser authentication or form workflows.
+The Dashboard now acts as a workspace launcher. Each selection opens a dedicated browser tab and focused section; the administrator tile is revealed only after the signed-in profile confirms the admin role. Static route/link checks passed. HTTP checks verify that files and query routes are served; they do not prove interactive browser authentication or form workflows.
 
 ## Canonical production safety
 
