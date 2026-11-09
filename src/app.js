@@ -6,6 +6,7 @@ const byId = id => document.getElementById(id);
 let currentUser = null;
 let currentRole = "artist";
 let directoryRecords = [];
+let adminDirectoryRecords = [];
 let currentOpportunityFilter = "all";
 
 function escapeHtml(value) {
@@ -61,6 +62,7 @@ function attachBackendForm(id, handler) {
       const target = id === "submissionForm" ? "formResult"
         : id === "shareMusicForm" ? "shareResult"
         : id === "campaignForm" ? "campaignResult"
+        : id === "adminDirectoryForm" ? "directoryResult"
         : "profileResult";
       setMessage(target, error?.message || "The request could not be completed.", true);
     }
@@ -94,7 +96,10 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
     const tags = [location, ...genres].map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join("");
     const link = safeHttpUrl(item.submission_url || item.website_url);
     const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">View destination ↗</a></p>' : "";
-    return '<article class="opportunity"><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + linkHtml + '</article>';
+    const submissionStatus = item.is_integrated && item.accepts_submissions
+      ? "In-platform submissions open"
+      : "External directory listing · in-platform submissions not enabled";
+    return '<article class="opportunity"><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + linkHtml + '</article>';
   }).join("");
 }
 
@@ -107,14 +112,14 @@ function populateSubmissionTargets() {
     radio: "radio_station",
     website: "website"
   })[typeSelect.value];
-  const available = directoryRecords.filter(item => item.category === category);
-  targetSelect.innerHTML = '<option value="">Choose a verified destination</option>' +
+  const available = directoryRecords.filter(item => item.category === category && item.is_integrated && item.accepts_submissions);
+  targetSelect.innerHTML = '<option value="">Choose an integrated destination</option>' +
     available.map(item => '<option value="' + escapeHtml(item.id) + '">' +
       escapeHtml(item.name) + (item.country ? " — " + escapeHtml(item.country) : "") +
       '</option>').join("");
   targetSelect.disabled = available.length === 0;
   if (!available.length) {
-    targetSelect.innerHTML = '<option value="">No verified destinations available</option>';
+    targetSelect.innerHTML = '<option value="">No integrated destinations are currently accepting submissions</option>';
   }
 }
 
@@ -122,7 +127,7 @@ async function loadDirectory() {
   if (!supabase) return;
   const { data, error } = await supabase
     .from("opportunity_directories")
-    .select("id,category,name,country,website_url,submission_url,genres")
+    .select("id,category,name,country,website_url,submission_url,genres,is_integrated,accepts_submissions")
     .eq("is_public", true)
     .eq("is_active", true)
     .eq("is_verified", true)
@@ -486,6 +491,113 @@ async function reviewMarketplaceTrack(trackId, decision) {
   await Promise.all([loadAdminMarketplaceQueue(), loadMarketplacePublic(), loadMarketplaceShares()]);
 }
 
+function clearAdminDirectoryForm() {
+  const form = byId("adminDirectoryForm");
+  if (!form) return;
+  form.reset();
+  if (byId("directoryId")) byId("directoryId").value = "";
+  if (byId("directoryActive")) byId("directoryActive").checked = true;
+  if (byId("directoryResult")) {
+    byId("directoryResult").style.display = "none";
+    byId("directoryResult").textContent = "";
+  }
+}
+
+function renderAdminDirectoryRecords() {
+  const root = byId("adminDirectoryList");
+  if (!root) return;
+  if (!adminDirectoryRecords.length) {
+    root.className = "empty";
+    root.textContent = "No directory records yet. Add a record above and verify it against its official source.";
+    return;
+  }
+  root.className = "";
+  root.innerHTML = adminDirectoryRecords.map(item => {
+    const tags = [
+      item.is_verified ? "Verified" : "Not verified",
+      item.is_public ? "Public" : "Private",
+      item.is_active ? "Active" : "Inactive",
+      item.is_integrated ? "Integration connected" : "Not integrated",
+      item.accepts_submissions ? "Accepting submissions" : "Submissions locked"
+    ].map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join(" ");
+    const link = safeHttpUrl(item.submission_url || item.website_url);
+    const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Official link ↗</a>' : "";
+    return '<div class="track"><div><b>' + escapeHtml(item.name) + '</b><br><span class="muted">' +
+      escapeHtml(item.category.replaceAll("_", " ")) + ' · ' + escapeHtml(item.country || "Country not set") +
+      '</span><div style="margin-top:8px">' + tags + '</div><div style="margin-top:6px">' + linkHtml +
+      '</div></div><button type="button" class="btn" data-directory-edit="' + escapeHtml(item.id) + '">Edit</button></div>';
+  }).join("");
+}
+
+async function loadAdminDirectory() {
+  if (!supabase || !currentUser || currentRole !== "admin") return;
+  const root = byId("adminDirectoryList");
+  if (root) root.textContent = "Loading directory records…";
+  const { data, error } = await supabase
+    .from("opportunity_directories")
+    .select("id,category,name,country,website_url,submission_url,contact_email,genres,is_verified,is_active,is_public,verification_evidence_url,is_integrated,accepts_submissions,verified_at,updated_at")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  adminDirectoryRecords = data || [];
+  renderAdminDirectoryRecords();
+}
+
+function editAdminDirectoryRecord(id) {
+  if (currentRole !== "admin") return;
+  const item = adminDirectoryRecords.find(record => record.id === id);
+  if (!item) return;
+  byId("directoryId").value = item.id;
+  byId("directoryCategory").value = item.category;
+  byId("directoryName").value = item.name || "";
+  byId("directoryCountry").value = item.country || "";
+  byId("directoryGenres").value = (item.genres || []).join(", ");
+  byId("directoryWebsite").value = item.website_url || "";
+  byId("directorySubmission").value = item.submission_url || "";
+  byId("directoryEmail").value = item.contact_email || "";
+  byId("directoryEvidence").value = item.verification_evidence_url || "";
+  byId("directoryVerified").checked = Boolean(item.is_verified);
+  byId("directoryActive").checked = Boolean(item.is_active);
+  byId("directoryPublic").checked = Boolean(item.is_public);
+  setMessage("directoryResult", "Editing " + item.name + ". Save to apply changes.");
+  byId("directoryName")?.focus();
+}
+
+async function saveAdminDirectoryRecord() {
+  if (currentRole !== "admin") throw new Error("Administrator access is required.");
+  const name = byId("directoryName").value.trim();
+  if (!name) throw new Error("A directory listing name is required.");
+  const websiteRaw = byId("directoryWebsite").value.trim();
+  const submissionRaw = byId("directorySubmission").value.trim();
+  const evidenceRaw = byId("directoryEvidence").value.trim();
+  const website = safeHttpUrl(websiteRaw);
+  const submission = safeHttpUrl(submissionRaw);
+  const evidence = safeHttpUrl(evidenceRaw);
+  if (websiteRaw && !website) throw new Error("Official website must be a valid http:// or https:// URL.");
+  if (submissionRaw && !submission) throw new Error("Submission page must be a valid http:// or https:// URL.");
+  if (byId("directoryVerified").checked && !evidence) {
+    throw new Error("Provide a public verification evidence URL before marking this listing verified.");
+  }
+  if (evidenceRaw && !evidence) throw new Error("Verification evidence must be a valid http:// or https:// URL.");
+  const { error } = await supabase.rpc("admin_upsert_opportunity_directory", {
+    p_category: byId("directoryCategory").value,
+    p_name: name,
+    p_country: byId("directoryCountry").value.trim() || null,
+    p_website_url: website,
+    p_submission_url: submission,
+    p_contact_email: byId("directoryEmail").value.trim() || null,
+    p_genres: splitList(byId("directoryGenres").value, 20),
+    p_is_verified: byId("directoryVerified").checked,
+    p_is_active: byId("directoryActive").checked,
+    p_is_public: byId("directoryPublic").checked,
+    p_verification_evidence_url: evidence,
+    p_id: byId("directoryId").value || null
+  });
+  if (error) throw error;
+  clearAdminDirectoryForm();
+  setMessage("directoryResult", "Directory listing saved. Integration and credit-charged submissions remain locked until the delivery adapter is deployed.");
+  await Promise.all([loadAdminDirectory(), loadDirectory()]);
+}
+
 async function loadArtistWorkspace() {
   if (!supabase || !currentUser) return;
   try {
@@ -496,7 +608,7 @@ async function loadArtistWorkspace() {
       loadCreditBalance(),
       loadMarketplaceShares(),
       loadCampaigns(),
-      currentRole === "admin" ? loadAdminMarketplaceQueue() : Promise.resolve()
+      currentRole === "admin" ? Promise.all([loadAdminMarketplaceQueue(), loadAdminDirectory()]) : Promise.resolve()
     ]);
   } catch (error) {
     setMessage("authResult", error.message || "Your artist workspace could not be loaded.", true);
@@ -537,6 +649,11 @@ document.getElementById("filters")?.addEventListener("click", event => {
   if (button) renderOpportunityCards(button.dataset.filter);
 });
 byId("submissionType")?.addEventListener("change", populateSubmissionTargets);
+byId("adminDirectoryList")?.addEventListener("click", event => {
+  const button = event.target.closest("button[data-directory-edit]");
+  if (button) editAdminDirectoryRecord(button.dataset.directoryEdit);
+});
+byId("directoryClear")?.addEventListener("click", clearAdminDirectoryForm);
 byId("adminMarketplaceQueue")?.addEventListener("click", async event => {
   const button = event.target.closest("button[data-review][data-track]");
   if (!button) return;
@@ -554,6 +671,7 @@ attachBackendForm("submissionForm", submitDirectoryOpportunity);
 attachBackendForm("shareMusicForm", shareMarketplaceTrack);
 attachBackendForm("campaignForm", submitCampaign);
 attachBackendForm("artistProfileForm", saveArtistProfile);
+attachBackendForm("adminDirectoryForm", saveAdminDirectoryRecord);
 
 async function initialise() {
   if (!supabase || !isSupabaseConfigured) {

@@ -1,6 +1,6 @@
 # Phase 4 — Supabase connection, migrations and authentication
 
-This runbook is for a **new Supabase environment** or a controlled rebuild. The existing Artist Frequency production project is already linked and migrations 0001–0014 are applied. Do not reapply migrations or create a second production project just to follow this guide.
+This runbook is for a **new Supabase environment** or a controlled rebuild. The existing Artist Frequency production project is already linked and migrations 0001–0015 are applied. Do not reapply migrations or create a second production project just to follow this guide.
 
 ## 1. Create or select a Supabase project
 
@@ -46,6 +46,7 @@ For a new environment, apply every migration in ascending numeric order:
 12. `0012_serialize_weekly_credit_reset.sql`
 13. `0013_restrict_updated_at_trigger_execution.sql`
 14. `0014_artist_profile_genres_and_press_kit.sql`
+15. `0015_secure_opportunity_directory_acceptance.sql`
 
 Review the pending migration list before any deployment:
 
@@ -79,7 +80,7 @@ Enable MFA for the administrator and protect recovery methods. Never place admin
 ## 7. Verify production configuration
 
 Use read-only SQL checks to confirm:
-- 11 public tables have RLS enabled.
+- 11 public tables have RLS enabled and the expected 21 policies are installed.
 - The expected RLS policies are present.
 - Anonymous access is limited to intended public read-only surfaces.
 - Artists can access only their own private records, subject to the RLS policies.
@@ -103,4 +104,4 @@ Do not manually run `run_weekly_credit_reset()` on production as a test. It chan
 
 ## Current boundary
 
-The Supabase production schema through migration 0014, least-privilege grants, RLS policies, credit submission RPC, weekly reset routine, Marketplace publisher and cron registrations are deployed. The frontend is wired to Supabase for authentication, profile, public directory/statistics, credit balance, submissions, campaign requests, Marketplace publishing display/shares and Marketplace approval/decline. Browser ES-module syntax and DOM references have been checked, but the complete user journey still requires browser validation after the site is served over HTTPS. The repository itself is not a hosting deployment. Remaining admin work includes directory management, campaign review and weekly Top 5 selection; Google OAuth and Spotify-based integrations require their provider/API configuration.
+The Supabase production schema through migration 0015, least-privilege grants, RLS policies, protected submission RPC, weekly reset routine, Marketplace publisher and cron registrations are deployed. The frontend is wired to Supabase for authentication, profile, public directory/statistics, credit balance, submissions, campaign requests, Marketplace publishing display/shares, Marketplace approval/decline and protected directory management. Migration 0015 requires a deployed delivery integration plus verified/public/active/accepting flags before a submission can debit credits; these flags default to false and cannot be toggled in the browser. Browser ES-module syntax and DOM references have been checked, but the complete user journey still requires browser validation on the protected HTTPS preview. The repository itself is not a hosting deployment. Remaining admin work includes campaign review and weekly Top 5 selection; Google OAuth and Spotify-based integrations require provider/API configuration.

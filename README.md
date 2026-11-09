@@ -8,10 +8,10 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 - **40 free credits** on artist registration.
 - Credits reset to exactly **40 every Monday at 00:05 Africa/Johannesburg time**. Months naturally contain four or five Monday resets. Unused credits do not roll over.
-- **1 playlist submission = 1 credit.**
-- **1 radio-station submission = 1 credit.**
-- **1 integrated website-promotion submission = 1 credit.** A destination must be verified, active and accepting submissions before it can be charged.
-- Admin account: **kingpinpkaytee@gmail.com**. The verified admin account has unlimited submissions.
+- **1 integrated playlist submission = 1 credit**, only when its destination has a deployed delivery integration and is verified, public, active and accepting submissions.
+- **1 integrated radio-station submission = 1 credit**, only when its destination has a deployed delivery integration and is verified, public, active and accepting submissions.
+- **1 integrated website-promotion submission = 1 credit**, only when its destination has a working delivery integration and is verified, public, active and explicitly accepting submissions.
+- Admin account: **kingpinpkaytee@gmail.com**. The verified admin account has unlimited credits, subject to destination eligibility.
 - Artist verification requires an authorised admin/trusted integration to confirm the artist follows the official Artist Frequency Spotify playlist. This workflow remains disabled until the official playlist is configured.
 - Public counters use real database counts of public artist profiles and verified, active directory entries.
 - Marketplace tracks require admin approval and publish after a 24-hour delay. Automatic promotion is internal to the Artist Frequency website.
@@ -20,10 +20,10 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 ## Production status — 9 November 2026
 
-The Supabase production project is linked and migrations **0001–0014** are applied.
+The Supabase production project is linked and migrations **0001–0015** are applied.
 
 - **11/11 public tables have RLS enabled.**
-- **20 RLS policies** are installed.
+- **21 RLS policies** are installed.
 - Table and view grants follow least-privilege rules. Anonymous access is limited to intended public read surfaces; credit balances are authenticated-only; Marketplace listing views are read-only.
 - Default privileges for future objects are hardened: new public tables/views and sequences are not automatically granted to browser roles, and new functions do not inherit PUBLIC/browser-role execution. Client-facing permissions must be granted explicitly.
 - The weekly reset job is scheduled for Monday 00:05 South African time (Sunday 22:05 UTC).
@@ -31,6 +31,7 @@ The Supabase production project is linked and migrations **0001–0014** are app
 - The registration/profile trigger and credit ledger rules are deployed. The protected submission RPC validates integrated destinations and deducts credits atomically.
 - Weekly resets take the same per-artist profile-row lock as credit-charged submissions, so a submission racing the Monday reset cannot leave an off-by-one balance.
 - Migration 0014 adds structured artist genres and a press-kit URL to artist profiles.
+- Migration 0015 adds explicit integration/acceptance gates for directory destinations and protected admin directory management. Both submission flags default to false.
 - No production balances or artist records were changed by the permissions migrations.
 
 ## Live frontend integration
@@ -45,6 +46,9 @@ Connected frontend flows include:
 - Credit-charged playlist, radio and website submissions through the protected `submit_artist_opportunity` RPC.
 - Artist campaign creation and retrieval.
 - Marketplace release sharing, public published-track/weekly Top 5 display, and a restricted admin Marketplace approval/decline queue.
+- Protected admin directory create/update, verification-evidence recording, listing publication and deactivation. Integration/acceptance flags are not user-editable and remain locked until a delivery adapter is deployed.
+
+No public verified directory entries are currently populated. Directory entries can be added by the admin, but credit-charged in-platform dispatch remains disabled until actual delivery adapters are deployed and enabled by trusted backend operations.
 
 Google OAuth still requires its provider and redirect URL to be configured in Supabase Auth. The browser code includes the OAuth flow, but availability must be confirmed in the Supabase dashboard. Spotify popularity is shown only from the dedicated `spotify_popularity` API field; no scraped or invented score is used. Playlist-follow verification remains disabled until the official playlist URL/ID and trusted verification process are configured.
 
@@ -67,6 +71,7 @@ The frontend has passed JavaScript ES-module syntax checks and a static DOM-bind
 - `supabase/migrations/0012_serialize_weekly_credit_reset.sql` — per-artist locking to serialize weekly resets against credit-charged submissions.
 - `supabase/migrations/0013_restrict_updated_at_trigger_execution.sql` — removes direct browser-role execution of the updated-at trigger helper.
 - `supabase/migrations/0014_artist_profile_genres_and_press_kit.sql` — structured artist genre and press-kit fields.
+- `supabase/migrations/0015_secure_opportunity_directory_acceptance.sql` — integration and acceptance gates, admin directory RPC and credit-spend eligibility checks.
 - `src/supabase-client.js` — one shared Supabase client and safe public-key configuration check.
 - `src/auth.js` — email/password, Google OAuth, session handling and sign-out.
 - `src/app.js` — live public data, artist dashboard, submissions, campaigns, Marketplace and admin moderation integration.
@@ -78,7 +83,7 @@ The frontend has passed JavaScript ES-module syntax checks and a static DOM-bind
 
 ## Setup and operational requirements
 
-For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0014 applied.
+For a **new** Supabase environment, apply migrations in numeric order and then verify the resulting grants, RLS policies and scheduled jobs. The production project already has migrations 0001–0015 applied.
 
 - Enable and verify email/password and Google OAuth providers; configure the Google Cloud OAuth client and Supabase redirect allowlist.
 - Serve the frontend over HTTPS and set the exact Site URL and allowed redirect URLs in Supabase Auth.
@@ -87,7 +92,7 @@ For a **new** Supabase environment, apply migrations in numeric order and then v
 - Keep the Monday credit reset and five-minute Marketplace publisher schedules enabled.
 - Configure the official Artist Frequency Spotify playlist and authorised verification workflow before enabling playlist-follow verification.
 - Populate directories only with verified, active and permission-appropriate opportunities.
-- Complete protected admin tools for directory management, campaign review and weekly Top 5 selection.
+- Complete protected admin tools for campaign review and weekly Top 5 selection; directory creation/update and Marketplace moderation are already available in the admin workspace.
 - Publish privacy, terms, content-rights and moderation policies before public launch.
 
 ## Vercel hosting state
