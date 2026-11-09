@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from "./supabase-client.js";
+﻿import { supabase, isSupabaseConfigured } from "./supabase-client.js";
 
 window.artistFrequencyBackendActive = true;
 
@@ -95,10 +95,10 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
     const genres = Array.isArray(item.genres) ? item.genres : [];
     const tags = [location, ...genres].map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join("");
     const link = safeHttpUrl(item.submission_url || item.website_url);
-    const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">View destination ↗</a></p>' : "";
+    const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">View destination â†—</a></p>' : "";
     const submissionStatus = item.is_integrated && item.accepts_submissions
       ? "In-platform submissions open"
-      : "External directory listing · in-platform submissions not enabled";
+      : "External directory listing Â· in-platform submissions not enabled";
     return '<article class="opportunity"><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + linkHtml + '</article>';
   }).join("");
 }
@@ -115,7 +115,7 @@ function populateSubmissionTargets() {
   const available = directoryRecords.filter(item => item.category === category && item.is_integrated && item.accepts_submissions);
   targetSelect.innerHTML = '<option value="">Choose an integrated destination</option>' +
     available.map(item => '<option value="' + escapeHtml(item.id) + '">' +
-      escapeHtml(item.name) + (item.country ? " — " + escapeHtml(item.country) : "") +
+      escapeHtml(item.name) + (item.country ? " â€” " + escapeHtml(item.country) : "") +
       '</option>').join("");
   targetSelect.disabled = available.length === 0;
   if (!available.length) {
@@ -189,7 +189,7 @@ function renderTopFive(items) {
   }
   root.innerHTML = items.map(item => {
     const url = safeHttpUrl(item.track_url);
-    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen ↗</a></p>' : "";
+    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen â†—</a></p>' : "";
     const artwork = safeHttpUrl(item.artwork_url);
     const image = artwork ? '<img src="' + escapeHtml(artwork) + '" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;margin:8px 0">' : "";
     return '<article class="feature"><div class="rank">#' + Number(item.rank) + '</div>' + image +
@@ -209,8 +209,8 @@ function renderPublishedMarketplace(items) {
     const url = safeHttpUrl(item.track_url);
     const art = safeHttpUrl(item.artwork_url);
     const image = art ? '<img src="' + escapeHtml(art) + '" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;margin-bottom:12px">' : "";
-    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen ↗</a></p>' : "";
-    const meta = [item.genre, item.country].filter(Boolean).join(" · ");
+    const link = url ? '<p><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Listen â†—</a></p>' : "";
+    const meta = [item.genre, item.country].filter(Boolean).join(" Â· ");
     return '<article class="opportunity">' + image + '<div class="eyebrow">' +
       (item.is_promoted ? "FEATURED MARKETPLACE RELEASE" : "MARKETPLACE RELEASE") +
       '</div><h3>' + escapeHtml(item.track_title) + '</h3><p>' +
@@ -314,9 +314,9 @@ async function loadArtistSubmissions() {
     const status = String(item.status || "pending").toLowerCase();
     const feedback = item.curator_feedback ? '<p class="muted" style="margin:6px 0 0">' + escapeHtml(item.curator_feedback) + '</p>' : "";
     const url = safeHttpUrl(item.track_url);
-    const link = url ? '<a target="_blank" rel="noopener noreferrer" href="' + escapeHtml(url) + '">Track link ↗</a>' : "";
+    const link = url ? '<a target="_blank" rel="noopener noreferrer" href="' + escapeHtml(url) + '">Track link â†—</a>' : "";
     return '<div class="track"><div><b>' + escapeHtml(item.track_title) + '</b><br><span class="muted">' +
-      escapeHtml(item.artist_name) + ' · ' + escapeHtml(item.genre) + ' · ' + escapeHtml(item.country) +
+      escapeHtml(item.artist_name) + ' Â· ' + escapeHtml(item.genre) + ' Â· ' + escapeHtml(item.country) +
       '</span><br>' + link + feedback + '</div><span class="status ' + escapeHtml(status) + '">' +
       escapeHtml(status) + '</span></div>';
   }).join("");
@@ -383,7 +383,7 @@ async function loadMarketplaceShares() {
   root.innerHTML = items.map(item => {
     const status = String(item.moderation_status || "pending").toLowerCase();
     return '<div class="track"><div><b>' + escapeHtml(item.track_title) + '</b><br><span class="muted">' +
-      escapeHtml(item.artist_display_name) + ' · ' + escapeHtml(item.genre) +
+      escapeHtml(item.artist_display_name) + ' Â· ' + escapeHtml(item.genre) +
       '</span></div><span class="status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span></div>';
   }).join("");
 }
@@ -427,7 +427,7 @@ async function loadCampaigns() {
   root.className = "";
   root.innerHTML = items.map(item =>
     '<div class="track"><div><b>' + escapeHtml(item.title) + '</b><br><span class="muted">' +
-    escapeHtml(item.campaign_goal) + ' · ' + escapeHtml((item.target_countries || []).join(", ")) +
+    escapeHtml(item.campaign_goal) + ' Â· ' + escapeHtml((item.target_countries || []).join(", ")) +
     '</span></div><span class="status ' + escapeHtml(item.status) + '">' +
     escapeHtml(item.status.replaceAll("_", " ")) + '</span></div>'
   ).join("");
@@ -474,9 +474,9 @@ async function loadAdminMarketplaceQueue() {
   root.className = "";
   root.innerHTML = items.map(item => {
     const url = safeHttpUrl(item.track_url);
-    const link = url ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Open DSP link ↗</a>' : "";
+    const link = url ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(url) + '">Open DSP link â†—</a>' : "";
     return '<div class="track"><div><b>' + escapeHtml(item.track_title) + '</b><br><span class="muted">' +
-      escapeHtml(item.artist_display_name) + ' · ' + escapeHtml(item.genre) + ' · ' + escapeHtml(item.country || "") +
+      escapeHtml(item.artist_display_name) + ' Â· ' + escapeHtml(item.genre) + ' Â· ' + escapeHtml(item.country || "") +
       '</span><br>' + link + '</div><div style="display:flex;gap:8px"><button class="btn primary" data-review="approved" data-track="' +
       escapeHtml(item.id) + '">Approve</button><button class="btn" data-review="declined" data-track="' +
       escapeHtml(item.id) + '">Decline</button></div></div>';
@@ -523,9 +523,9 @@ function renderAdminDirectoryRecords() {
       item.accepts_submissions ? "Accepting submissions" : "Submissions locked"
     ].map(tag => '<span class="tag">' + escapeHtml(tag) + '</span>').join(" ");
     const link = safeHttpUrl(item.submission_url || item.website_url);
-    const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Official link ↗</a>' : "";
+    const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Official link â†—</a>' : "";
     return '<div class="track"><div><b>' + escapeHtml(item.name) + '</b><br><span class="muted">' +
-      escapeHtml(item.category.replaceAll("_", " ")) + ' · ' + escapeHtml(item.country || "Country not set") +
+      escapeHtml(item.category.replaceAll("_", " ")) + ' Â· ' + escapeHtml(item.country || "Country not set") +
       '</span><div style="margin-top:8px">' + tags + '</div><div style="margin-top:6px">' + linkHtml +
       '</div></div><button type="button" class="btn" data-directory-edit="' + escapeHtml(item.id) + '">Edit</button></div>';
   }).join("");
@@ -534,7 +534,7 @@ function renderAdminDirectoryRecords() {
 async function loadAdminDirectory() {
   if (!supabase || !currentUser || currentRole !== "admin") return;
   const root = byId("adminDirectoryList");
-  if (root) root.textContent = "Loading directory records…";
+  if (root) root.textContent = "Loading directory recordsâ€¦";
   const { data, error } = await supabase
     .from("opportunity_directories")
     .select("id,category,name,country,website_url,submission_url,contact_email,genres,is_verified,is_active,is_public,verification_evidence_url,is_integrated,accepts_submissions,verified_at,updated_at")
@@ -600,18 +600,142 @@ async function saveAdminDirectoryRecord() {
   await Promise.all([loadAdminDirectory(), loadDirectory()]);
 }
 
+function formatZar(minor) {
+  return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(Number(minor || 0) / 100);
+}
+
+async function loadArtistInvoices() {
+  const root = byId("artistInvoices");
+  if (!root || !supabase || !currentUser) return;
+  root.className = "empty";
+  root.textContent = "Loading your invoices…";
+  const { data, error } = await supabase.from("artist_invoices")
+    .select("id,invoice_number,total_minor,currency,status,created_at,due_at")
+    .eq("artist_id", currentUser.id).order("created_at", { ascending: false });
+  if (error) { root.className = "empty"; root.textContent = "Invoice service is not available yet. Please check again after billing is enabled."; return; }
+  if (!data?.length) {
+    root.className = "empty";
+    root.textContent = "No invoices have been issued to this artist account yet.";
+    return;
+  }
+  root.className = "";
+  root.innerHTML = data.map(invoice => {
+    const payable = ["open", "pending_payment"].includes(invoice.status);
+    const due = invoice.due_at ? new Date(invoice.due_at).toLocaleDateString("en-ZA") : "No due date";
+    return '<div class="track"><div><b>' + escapeHtml(invoice.invoice_number) + '</b><br><span class="muted">' +
+      escapeHtml(formatZar(invoice.total_minor)) + ' · ' + escapeHtml(invoice.status.replaceAll("_", " ")) +
+      ' · ' + escapeHtml(due) + '</span></div><div>' + (payable
+        ? '<button class="btn primary" type="button" data-pay-invoice="' + escapeHtml(invoice.id) + '">Pay securely</button>'
+        : '<span class="status ' + (invoice.status === "paid" ? "approved" : "pending") + '">' + escapeHtml(invoice.status.toUpperCase()) + '</span>') +
+      '</div></div>';
+  }).join("");
+}
+
+async function startInvoiceCheckout(invoiceId, button) {
+  requireUser();
+  if (button) { button.disabled = true; button.textContent = "Preparing checkout…"; }
+  try {
+    const { data, error } = await supabase.functions.invoke("create-paystack-checkout", { body: { invoice_id: invoiceId } });
+    if (error) throw error;
+    const checkout = safeHttpUrl(data?.checkout_url);
+    if (!checkout || new URL(checkout).hostname !== "checkout.paystack.com") {
+      throw new Error(data?.error || "The provider did not return a recognised secure checkout link.");
+    }
+    window.location.assign(checkout);
+  } catch (error) {
+    setMessage("authResult", error.message || "Secure checkout could not be started.", true);
+    if (button) { button.disabled = false; button.textContent = "Pay securely"; }
+  }
+}
+
+async function refreshAdminPaymentStatus() {
+  if (currentRole !== "admin" || !supabase) return;
+  const status = byId("paymentProviderStatus");
+  const payout = byId("paymentPayoutStatus");
+  const message = byId("paymentProviderMessage");
+  if (status) status.textContent = "Checking…";
+  if (message) message.textContent = "Verifying the server-side Paystack credential with the provider…";
+  const { data, error } = await supabase.functions.invoke("payment-admin-status", { body: {} });
+  if (error) throw error;
+  if (status) status.textContent = data?.connection_status === "connected"
+    ? "API verified · " + String(data.environment || "unknown").toUpperCase()
+    : String(data?.connection_status || "not connected").replaceAll("_", " ");
+  if (payout) payout.textContent = data?.payouts_ready ? "Enabled" : "Not enabled / provider approval required";
+  if (message) message.textContent = data?.message || data?.error || "No provider status returned.";
+}
+
+async function loadAdminInvoiceArtists() {
+  if (currentRole !== "admin" || !supabase) return;
+  const select = byId("invoiceArtist");
+  if (!select) return;
+  const { data, error } = await supabase.rpc("admin_list_invoice_artists");
+  if (error) throw error;
+  select.innerHTML = '<option value="">Choose an artist account</option>' + (data || []).map(artist =>
+    '<option value="' + escapeHtml(artist.id) + '">' + escapeHtml(artist.artist_name || "Unnamed artist") +
+    (artist.country ? ' · ' + escapeHtml(artist.country) : "") + '</option>'
+  ).join("");
+}
+
+async function loadAdminInvoices() {
+  if (currentRole !== "admin" || !supabase) return;
+  const root = byId("adminInvoiceList");
+  if (!root) return;
+  const { data, error } = await supabase.from("artist_invoices")
+    .select("id,invoice_number,artist_id,total_minor,status,created_at")
+    .order("created_at", { ascending: false }).limit(30);
+  if (error) throw error;
+  if (!data?.length) { root.className = "empty"; root.textContent = "No invoices created yet."; return; }
+  root.className = "";
+  root.innerHTML = data.map(invoice => '<div class="track"><div><b>' + escapeHtml(invoice.invoice_number) +
+    '</b><br><span class="muted">Artist ID: ' + escapeHtml(invoice.artist_id) + ' · ' +
+    escapeHtml(formatZar(invoice.total_minor)) + ' · ' + escapeHtml(invoice.status.replaceAll("_", " ")) +
+    '</span></div></div>').join("");
+}
+
+async function createAdminInvoice(event) {
+  if (currentRole !== "admin") throw new Error("Administrator access is required.");
+  const artistId = byId("invoiceArtist")?.value;
+  const description = byId("invoiceDescription")?.value.trim();
+  const quantity = Number(byId("invoiceQuantity")?.value || 1);
+  const amount = Number(byId("invoiceUnitAmount")?.value);
+  const credits = Number(byId("invoiceCredits")?.value || 0);
+  const amountMinor = Math.round(amount * 100);
+  if (!artistId || !description) throw new Error("Choose an artist and enter the service description.");
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) throw new Error("Quantity must be between 1 and 1,000.");
+  if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - amountMinor) > 0.0001) throw new Error("Enter a valid ZAR amount with no more than two decimal places.");
+  if (!Number.isInteger(credits) || credits < 0 || credits > 100000) throw new Error("Credit quantity must be a whole number from 0 to 100,000.");
+  const dueValue = byId("invoiceDue")?.value;
+  const dueAt = dueValue ? new Date(dueValue + "T23:59:59+02:00").toISOString() : null;
+  const { data, error } = await supabase.rpc("admin_create_artist_invoice", {
+    p_artist_id: artistId,
+    p_items: [{ description, quantity, unit_amount_minor: amountMinor, credit_quantity: credits }],
+    p_tax_minor: 0,
+    p_notes: byId("invoiceNotes")?.value.trim() || "",
+    p_due_at: dueAt
+  });
+  if (error) throw error;
+  byId("adminInvoiceForm").reset();
+  if (byId("invoiceQuantity")) byId("invoiceQuantity").value = "1";
+  if (byId("invoiceCredits")) byId("invoiceCredits").value = "0";
+  setMessage("adminInvoiceResult", "Invoice created: " + String(data) + ". The artist can now view it in Invoices & payments.");
+  await Promise.all([loadAdminInvoices(), loadArtistInvoices()]);
+}
 async function loadArtistWorkspace() {
   if (!supabase || !currentUser) return;
   try {
     const profile = await loadArtistProfile();
     if (!profile) throw new Error("Your artist profile has not been created yet. Please refresh after confirming your email.");
-    await Promise.all([
-      loadArtistSubmissions(),
-      loadCreditBalance(),
-      loadMarketplaceShares(),
-      loadCampaigns(),
-      currentRole === "admin" ? Promise.all([loadAdminMarketplaceQueue(), loadAdminDirectory()]) : Promise.resolve()
-    ]);
+    await Promise.all([loadArtistSubmissions(), loadCreditBalance(), loadMarketplaceShares(), loadCampaigns(), loadArtistInvoices()]);
+    if (currentRole === "admin") {
+      const adminLoads = await Promise.allSettled([
+        loadAdminMarketplaceQueue(), loadAdminDirectory(), refreshAdminPaymentStatus(),
+        loadAdminInvoiceArtists(), loadAdminInvoices()
+      ]);
+      const failures = adminLoads.filter(result => result.status === "rejected");
+      if (failures.length && byId("paymentProviderMessage")) {
+        byId("paymentProviderMessage").textContent = failures.map(result => result.reason?.message || "An admin finance service is not deployed yet.").join(" · ");
+      }
+    }
   } catch (error) {
     setMessage("authResult", error.message || "Your artist workspace could not be loaded.", true);
   }
@@ -624,13 +748,14 @@ async function updateSessionUser(user) {
     currentRole = "artist";
     if (byId("adminArea")) byId("adminArea").hidden = true;
     if (byId("adminDashboardTile")) byId("adminDashboardTile").hidden = true;
+    if (byId("artistInvoices")) { byId("artistInvoices").className = "empty"; byId("artistInvoices").textContent = "Sign in to view your invoices."; }
     if (byId("trackList")) {
       byId("trackList").className = "empty";
       byId("trackList").textContent = "Sign in to view your submissions.";
     }
-    if (byId("creditBalance")) byId("creditBalance").textContent = "—";
+    if (byId("creditBalance")) byId("creditBalance").textContent = "â€”";
     ["profileArtistName", "profileCountry", "profileBio", "profileWebsite", "profilePressKit", "spotifyArtist", "profileGenres", "profileLinks"].forEach(id => { if (byId(id)) byId(id).value = ""; });
-    if (byId("spotifyPopularity")) byId("spotifyPopularity").textContent = "—";
+    if (byId("spotifyPopularity")) byId("spotifyPopularity").textContent = "â€”";
     if (byId("verificationStatus")) byId("verificationStatus").textContent = "Not verified";
     if (byId("trackCount")) byId("trackCount").textContent = "0";
     ["pendingCount", "approvedCount", "declinedCount"].forEach(id => { if (byId(id)) byId(id).textContent = "0"; });

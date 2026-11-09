@@ -77,3 +77,37 @@ The migration is **not applied to production**. Review and apply it only through
 - Live payment and payout: disabled.
 
 No invoice can be paid through the platform and no paid credit package can be fulfilled until the server-side checkout, webhook, verification and admin connection work is completed and tested.
+
+
+## Server-side functions added in the next implementation phase
+
+- `create-paystack-checkout`: authenticated artist only; looks up the invoice by the signed-in artist ID; calculates the amount from the stored invoice; creates a payment attempt; asks Paystack for hosted checkout; returns only the hosted URL.
+- `paystack-webhook`: JWT verification is disabled only for this provider callback; validates the raw-body `x-paystack-signature` HMAC-SHA512; deduplicates provider events; verifies the transaction directly with Paystack; checks amount and ZAR currency; invokes the atomic settlement RPC.
+- `payment-admin-status`: verifies the signed-in user and calls the existing `is_site_admin` RPC using that user's JWT; checks the server-side Paystack key with the provider; never returns the key.
+- Migration `0018_verified_payment_settlement.sql`: service-role-only settlement RPC; issues purchased credits once using the unique purchase-grant ledger index; adds an admin-only artist list RPC for invoice creation.
+
+## Required deployment sequence
+
+1. Review and apply migrations 0017 and 0018 to Supabase production through the approved migration process.
+2. Add these secrets in Supabase Project → Edge Functions → Secrets:
+   - `PAYSTACK_SECRET_KEY` (start with a test key)
+   - `APP_ORIGIN` (the exact deployed site origin, e.g. `https://artist-frequency.vercel.app`)
+   - `CORS_ALLOWED_ORIGINS` (comma-separated exact origins allowed to call browser-facing functions; include only the active production/preview origins)
+   - `PAYMENT_RETURN_URL` (an HTTPS URL on the site, e.g. `https://artist-frequency.vercel.app/?view=billing&payment=return`)
+   Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` to Edge Functions. Never copy the service-role key into frontend configuration.
+3. Deploy the three functions:
+   - `npx --yes supabase@latest functions deploy create-paystack-checkout --project-ref mdcvewnevgsgmyfnybgn`
+   - `npx --yes supabase@latest functions deploy payment-admin-status --project-ref mdcvewnevgsgmyfnybgn`
+   - `npx --yes supabase@latest functions deploy paystack-webhook --project-ref mdcvewnevgsgmyfnybgn`
+4. Configure the webhook URL in the Paystack dashboard as:
+   `https://mdcvewnevgsgmyfnybgn.supabase.co/functions/v1/paystack-webhook`
+5. Test with Paystack test keys and test transactions. Confirm webhook delivery, invoice paid state, one-time ledger grant, duplicate webhook handling, failed checkout and amount/currency mismatch.
+6. Only after successful sandbox QA, replace the test secret with the live secret and repeat the verification. Keep payouts disabled until Paystack confirms the merchant's South African transfer capability and bank beneficiary checks.
+
+## Current limits
+
+- The UI now includes an artist invoice workspace and a restricted admin Payment Centre / custom invoice form.
+- Payouts to artists, suppliers or third parties are intentionally not enabled. The provider's own settlement bank account is linked in the provider's official dashboard. Any later artist/vendor payout system requires separate approval, beneficiary verification, sufficient balance controls, audit logs and legal/accounting terms.
+- Invoice prices are manually entered by the administrator. The previously proposed service tariff is not activated or assumed approved.
+- Tax is zero by default. VAT must not be charged or described as applicable unless the business's VAT registration and tax obligations have been confirmed.
+- These functions and UI are source code only until migrations, secrets, function deployments, webhook registration and end-to-end sandbox testing are completed.
