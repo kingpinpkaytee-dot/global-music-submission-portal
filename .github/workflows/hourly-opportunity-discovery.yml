@@ -17,10 +17,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Discover, verify and update opportunities
+      - name: Validate configuration
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-          GOOGLE_CSE_ID: ${{ secrets.GOOGLE_CSE_ID }}
+          GOOGLE_CSE_ID: ${{ vars.GOOGLE_CSE_ID }}
+        run: |
+          test -n "$SUPABASE_URL" || (echo "::error::Missing Actions variable SUPABASE_URL"; exit 1)
+          test -n "$GOOGLE_CSE_ID" || (echo "::error::Missing Actions variable GOOGLE_CSE_ID"; exit 1)
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "::error::Missing Actions secret SUPABASE_SERVICE_ROLE_KEY"; exit 1)
+          test -n "$GOOGLE_CSE_API_KEY" || (echo "::error::Missing Actions secret GOOGLE_CSE_API_KEY"; exit 1)
+      - name: Discover, verify and update opportunities
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+          GOOGLE_CSE_ID: ${{ vars.GOOGLE_CSE_ID }}
         run: node scripts/hourly-opportunity-discovery.mjs
