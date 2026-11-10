@@ -54,6 +54,14 @@ async function fetchFeed(url,label){
  if(items.length)return items;
  throw new Error(label+" returned no parseable results (type="+(res.headers.get("content-type")||"unknown")+", bytes="+body.length+", preview="+body.slice(0,100).replace(/\s+/g," ")+")");
 }
+function googleNewsEmbeddedUrl(link){
+ try{
+  const match=String(link).match(/\/rss\/articles\/([^?]+)/i);if(!match)return null;
+  const decoded=Buffer.from(match[1].replace(/-/g,"+").replace(/_/g,"/"),"base64").toString("utf8");
+  const urls=decoded.match(/https?:\/\/[^\s"'<>\\u0000-\\u001f]+/g)||[];
+  for(const raw of urls){try{const u=new URL(raw);if(!/(^|\.)news\.google\.com$/i.test(u.hostname))return u.toString();}catch{}}
+ }catch{} return null;
+}
 async function search(q){
  const providers=[
   {name:"Bing RSS",run:async()=>{
@@ -71,14 +79,23 @@ async function search(q){
    const res=await fetch(u,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
    const html=await res.text();
    if(!res.ok)throw new Error("DuckDuckGo Lite HTTP "+res.status+": "+html.slice(0,220).replace(/\s+/g," "));
-   const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result-link[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
+   if(/anomaly-modal|bots use duckduckgo|select all squares|unusual traffic|captcha/i.test(html.slice(0,30000)))
+    throw new Error("DuckDuckGo Lite anti-bot/challenge response (bytes="+html.length+")");
+   // Lite markup varies: parse outbound anchors rather than relying on one CSS class.
+   const anchors=[...html.matchAll(/<a\b([^>]*?)>([\s\S]*?)<\/a>/gi)];
    const items=anchors.map(m=>{
     const href=m[1].match(/href=["']([^"']+)["']/i);let link=href?decodeHtml(href[1]):"";
-    try{const p=new URL(link);if(p.hostname.includes("duckduckgo.com")&&p.searchParams.has("uddg"))link=p.searchParams.get("uddg");}catch{}
-    const near=html.slice(m.index,m.index+3500),snip=near.match(/class=["'][^"']*result-snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
-    return {title:stripTags(m[2]),link,snippet:snip?stripTags(snip[1]):""};
-   }).filter(x=>/^https?:\/\//i.test(x.link));
-   if(!items.length)throw new Error("DuckDuckGo Lite returned no result-link anchors (bytes="+html.length+", preview="+html.slice(0,180).replace(/\s+/g," ")+")");
+    try{
+     const p=new URL(link);
+     if(p.hostname.includes("duckduckgo.com"))for(const key of ["uddg","url","u"])if(p.searchParams.has(key)){link=decodeHtml(p.searchParams.get(key));break;}
+    }catch{}
+    const title=stripTags(m[2]);
+    return {title,link,snippet:""};
+   }).filter(x=>{
+    try{const u=new URL(x.link);return /^https?:$/.test(u.protocol)&&!/(^|\.)duckduckgo\.com$/i.test(u.hostname)&&x.title.length>2&&!/^(next|previous|more|settings|images|videos|maps)$/i.test(x.title);}
+    catch{return false;}
+   });
+   if(!items.length)throw new Error("DuckDuckGo Lite returned no usable outbound anchors (bytes="+html.length+", preview="+html.slice(0,220).replace(/\s+/g," ")+")");
    return items;
   }}
  ];
@@ -166,6 +183,7 @@ async function main(){
     // Follow Google News RSS redirects once; retain only real publisher destinations.
     let urlHost="";
     try{urlHost=new URL(url).hostname.toLowerCase();}catch{}
+    if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))url=googleNewsEmbeddedUrl(url)||url;
     let page=await inspect(url);
     if((urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))&&page.ok){
      let finalHost="";try{finalHost=new URL(page.finalUrl||url).hostname.toLowerCase();}catch{}
@@ -186,7 +204,7 @@ async function main(){
      playlist:!spotifyDestination&&submissionEvidence&&!!ev.spotifyUrl&&/(playlist|curator|submit)/i.test(searchable),
      curator:!spotifyDestination&&submissionEvidence&&/(playlist curator|curator|submit.*playlist|playlist.*submit)/i.test(searchable),
      radio_station:!genericRadioLanding&&submissionEvidence&&/(radio|broadcast|fm|station)/i.test(searchable),
-     blogger:submissionEvidence&&/(music blog|blog|magazine|editorial|music review)/i.test(searchable)
+     blogger:submissionEvidence&&/(music blog|blog|magazine|editorial|music review)/i.test(searchable)&&!/(submithub|submitlink|playlistdock|indiemono|audiartist)/i.test(host)
     }[item.category]===true;
     if(!categoryRelevant){
      rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",spotifyDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
