@@ -121,4 +121,90 @@ COMMENT ON FUNCTION public.submit_artist_opportunity(
   text,text,text,text,text,text,uuid,text
 ) IS 'Creates a credit-charged submission only for verified, public, active destinations with a trusted deployed delivery integration and explicit acceptance. Supports playlists, radio, websites, curators, platforms and contacts.';
 
+
+-- Extend the protected administrator directory RPC to accept contact records.
+CREATE OR REPLACE FUNCTION public.admin_upsert_opportunity_directory(
+  p_category text,
+  p_name text,
+  p_country text DEFAULT NULL,
+  p_website_url text DEFAULT NULL,
+  p_submission_url text DEFAULT NULL,
+  p_contact_email text DEFAULT NULL,
+  p_genres text[] DEFAULT '{}'::text[],
+  p_is_verified boolean DEFAULT false,
+  p_is_active boolean DEFAULT true,
+  p_is_public boolean DEFAULT false,
+  p_verification_evidence_url text DEFAULT NULL,
+  p_id uuid DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE saved_id uuid;
+BEGIN
+  IF NOT public.is_site_admin() THEN RAISE EXCEPTION 'Admin access required'; END IF;
+  IF p_category IS NULL OR p_category NOT IN ('platform','curator','radio_station','blogger','playlist','website','contact') THEN
+    RAISE EXCEPTION 'Unsupported directory category';
+  END IF;
+  IF p_name IS NULL OR char_length(btrim(p_name)) NOT BETWEEN 1 AND 160 THEN
+    RAISE EXCEPTION 'Directory name must contain 1 to 160 characters';
+  END IF;
+  IF coalesce(char_length(p_country),0)>80 OR coalesce(char_length(p_contact_email),0)>254
+     OR coalesce(array_length(p_genres,1),0)>20 THEN
+    RAISE EXCEPTION 'Directory metadata exceeds allowed limits';
+  END IF;
+  IF p_website_url IS NOT NULL AND p_website_url !~* '^https?://' THEN RAISE EXCEPTION 'Website URL must use http or https'; END IF;
+  IF p_submission_url IS NOT NULL AND p_submission_url !~* '^https?://' THEN RAISE EXCEPTION 'Submission URL must use http or https'; END IF;
+  IF p_is_verified AND (p_verification_evidence_url IS NULL OR p_verification_evidence_url !~* '^https?://') THEN
+    RAISE EXCEPTION 'A valid verification evidence URL is required before marking a listing verified';
+  END IF;
+  IF p_is_public AND (NOT p_is_verified OR NOT p_is_active) THEN
+    RAISE EXCEPTION 'Only verified and active directory records may be public';
+  END IF;
+
+  IF p_id IS NULL THEN
+    INSERT INTO public.opportunity_directories (
+      category,name,country,website_url,submission_url,contact_email,genres,
+      is_verified,is_active,is_public,verification_evidence_url,verified_at,verified_by,
+      is_integrated,accepts_submissions
+    ) VALUES (
+      p_category,btrim(p_name),nullif(btrim(coalesce(p_country,'')),''),
+      nullif(btrim(coalesce(p_website_url,'')),''),nullif(btrim(coalesce(p_submission_url,'')),''),
+      nullif(btrim(coalesce(p_contact_email,'')),''),coalesce(p_genres,'{}'::text[]),
+      p_is_verified,p_is_active,p_is_public,
+      CASE WHEN p_is_verified THEN p_verification_evidence_url ELSE NULL END,
+      CASE WHEN p_is_verified THEN now() ELSE NULL END,
+      CASE WHEN p_is_verified THEN auth.uid() ELSE NULL END,false,false
+    ) RETURNING id INTO saved_id;
+  ELSE
+    UPDATE public.opportunity_directories
+    SET category=p_category,name=btrim(p_name),
+      country=nullif(btrim(coalesce(p_country,'')),''),
+      website_url=nullif(btrim(coalesce(p_website_url,'')),''),
+      submission_url=nullif(btrim(coalesce(p_submission_url,'')),''),
+      contact_email=nullif(btrim(coalesce(p_contact_email,'')),''),
+      genres=coalesce(p_genres,'{}'::text[]),
+      is_verified=p_is_verified,is_active=p_is_active,is_public=p_is_public,
+      verification_evidence_url=CASE WHEN p_is_verified THEN p_verification_evidence_url ELSE NULL END,
+      verified_at=CASE WHEN p_is_verified THEN coalesce(verified_at,now()) ELSE NULL END,
+      verified_by=CASE WHEN p_is_verified THEN coalesce(verified_by,auth.uid()) ELSE NULL END,
+      accepts_submissions=CASE WHEN p_is_verified AND p_is_active AND p_is_public THEN accepts_submissions ELSE false END,
+      updated_at=now()
+    WHERE id=p_id RETURNING id INTO saved_id;
+    IF saved_id IS NULL THEN RAISE EXCEPTION 'Directory record not found'; END IF;
+  END IF;
+  RETURN saved_id;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.admin_upsert_opportunity_directory(
+  text,text,text,text,text,text,text[],boolean,boolean,boolean,text,uuid
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_upsert_opportunity_directory(
+  text,text,text,text,text,text,text[],boolean,boolean,boolean,text,uuid
+) TO authenticated;
+
+
 COMMIT;
