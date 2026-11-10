@@ -29,6 +29,4 @@ jobs:
         env:
           SUPABASE_URL: https://mdcvewnevgsgmyfnybgn.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-          GOOGLE_CSE_ID: d54a5ff6d8afc44d4
         run: node scripts/hourly-opportunity-discovery.mjs
