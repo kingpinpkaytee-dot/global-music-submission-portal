@@ -391,15 +391,15 @@ async function main(){
     const candidate={category:item.category,name,country:item.region||null,dsp_name:ev.dspName||item.dsp||(item.category==="playlist"?"Spotify":null),
      genres:extractedGenres,website_url:ev.playlistUrl||finalUrl,submission_url:ev.ok?finalUrl:null,contact_email:email,
      submission_method:email?"email":(ev.ok?(/mailto:/i.test(html)?"email":"form"):"unknown"),
-     accepts_free_submissions:false,follower_count:followerCount,
-     activity_status:"unknown",source_name:(hit.provider||"Public Web Search")+(item.dsp?" / "+item.dsp:""),
+     accepts_free_submissions:false,follower_count:followerCount,response_rate:responseRate,
+     activity_status:activityStatus,source_name:(hit.provider||"Public Web Search")+(item.dsp?" / "+item.dsp:""),
      source_url:finalUrl,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending",
      ...(autoPublicationEnabled?{auto_verification:ev.ok&&corroboration.ok?{schema_version:"1",score:98,reachable:true,direct_page_evidence:true,
       submission_route_found:true,category_match:true,canonical_destination:true,
       independent_corroboration:true,independent_source_reachable:true,
       independent_identity_match:true,independent_source_url:corroboration.url,
       individual_playlist_url:ev.playlistUrl||null,verified_at:now(),
-      verification_method:"live publisher-page inspection plus independent reachable source corroborating identity and category"}:null,
+      verification_method:"live publisher-page inspection plus independent reachable source corroborating playlist identity and category; follower, active-status and response-rate thresholds met"}:null,
       auto_verified_at:ev.ok&&corroboration.ok?now():null}:{})};
     const inserted=await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(candidate)});
     const saved=Array.isArray(inserted)?inserted[0]:null;
