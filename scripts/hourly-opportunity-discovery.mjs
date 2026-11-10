@@ -71,13 +71,13 @@ async function search(q){
    const res=await fetch(u,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
    const html=await res.text();
    if(!res.ok)throw new Error("DuckDuckGo HTML HTTP "+res.status+": "+html.slice(0,160));
-   const anchors=[...html.matchAll(/<a\\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\\s\\S]*?)<\\/a>/gi)];
+   const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
    const items=anchors.map(m=>{
     const href=m[1].match(/href=["']([^"']+)["']/i);let link=href?decodeHtml(href[1]):"";
     try{const p=new URL(link);if(p.hostname.includes("duckduckgo.com")&&p.searchParams.has("uddg"))link=p.searchParams.get("uddg");}catch{}
-    const near=html.slice(m.index,m.index+5000),snip=near.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i);
+    const near=html.slice(m.index,m.index+5000),snip=near.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
     return {title:stripTags(m[2]),link,snippet:snip?stripTags(snip[1]):""};
-   }).filter(x=>/^https?:\\/\\//i.test(x.link));
+   }).filter(x=>/^https?:\/\//i.test(x.link));
    if(!items.length)throw new Error("DuckDuckGo returned no result anchors (bytes="+html.length+")");
    return items;
   }}
@@ -104,7 +104,7 @@ async function search(q){
  for(const hit of merged){
   try{
    const u=new URL(hit.link);u.hash="";u.search="";
-   const key=u.toString().replace(/\\/$/,"").toLowerCase();
+   const key=u.toString().replace(/\/$/,"").toLowerCase();
    if(seen.has(key))continue;seen.add(key);unique.push(hit);
   }catch{}
  }
