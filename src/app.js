@@ -634,6 +634,60 @@ async function loadAdminDirectory() {
   renderAdminDirectoryRecords();
 }
 
+
+let adminDiscoveryCandidates = [];
+
+function renderAdminCandidates() {
+  const root = byId("candidateReviewList");
+  if (!root) return;
+  if (!adminDiscoveryCandidates.length) {
+    root.className = "empty";
+    root.textContent = "No pending Google Search candidates. New discoveries will appear here for review.";
+    return;
+  }
+  root.className = "";
+  root.innerHTML = adminDiscoveryCandidates.map(item => {
+    const link = safeHttpUrl(item.submission_url || item.website_url || item.source_url);
+    const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Open submission evidence ↗</a>' : "";
+    const email = String(item.contact_email || "").trim();
+    const emailHtml = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)
+      ? '<p class="form-note">Contact: <a href="mailto:' + escapeHtml(email) + '">' + escapeHtml(email) + '</a></p>' : "";
+    const tags = [item.country || "Global", ...(item.genres || []), item.submission_method || "route unknown",
+      item.accepts_free_submissions ? "Free route stated" : "Fee not confirmed"].map(x => '<span class="tag">' + escapeHtml(x) + '</span>').join(" ");
+    return '<article class="track" style="align-items:flex-start"><div style="flex:1"><b>' + escapeHtml(item.name) + '</b><br><span class="muted">' +
+      escapeHtml(String(item.category || "").replaceAll("_"," ")) + ' · ' + escapeHtml(item.source_name || "Google Search") +
+      '</span><div style="margin:8px 0">' + tags + '</div>' + emailHtml +
+      '<p class="form-note">' + linkHtml + (item.source_url ? ' · <a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(item.source_url) + '">Source ↗</a>' : "") + '</p>' +
+      '</div><div class="auth-actions"><button type="button" class="btn primary" data-candidate-review="accept" data-candidate-id="' + escapeHtml(item.id) + '">Approve & publish</button>' +
+      '<button type="button" class="btn" data-candidate-review="reject" data-candidate-id="' + escapeHtml(item.id) + '">Reject</button></div></article>';
+  }).join("");
+}
+
+async function loadAdminCandidates() {
+  if (!supabase || !currentUser || currentRole !== "admin") return;
+  const root = byId("candidateReviewList");
+  if (root) root.textContent = "Loading pending Google Search candidates…";
+  const { data, error } = await supabase.from("opportunity_discovery_candidates")
+    .select("id,category,name,country,dsp_name,genres,website_url,submission_url,contact_email,submission_method,accepts_free_submissions,activity_status,source_name,source_url,evidence_url,review_status,created_at")
+    .eq("review_status","pending").order("created_at",{ascending:false}).limit(100);
+  if (error) throw error;
+  adminDiscoveryCandidates = data || [];
+  renderAdminCandidates();
+}
+
+async function reviewAdminCandidate(id, decision) {
+  if (currentRole !== "admin") throw new Error("Administrator access is required.");
+  const { data, error } = await supabase.rpc("admin_review_opportunity_candidate", {
+    p_candidate_id: id,
+    p_decision: decision
+  });
+  if (error) throw error;
+  setMessage("candidateReviewResult", decision === "accept"
+    ? "Candidate approved and published as a public listing. In-platform delivery remains disabled."
+    : "Candidate rejected and kept out of the public directory.");
+  await Promise.all([loadAdminCandidates(), loadAdminDirectory(), loadDirectory()]);
+}
+
 function editAdminDirectoryRecord(id) {
   if (currentRole !== "admin") return;
   const item = adminDirectoryRecords.find(record => record.id === id);
@@ -818,7 +872,7 @@ async function loadArtistWorkspace() {
     await Promise.all([loadArtistSubmissions(), loadCreditBalance(), loadMarketplaceShares(), loadCampaigns(), loadArtistInvoices()]);
     if (currentRole === "admin") {
       const adminLoads = await Promise.allSettled([
-        loadAdminMarketplaceQueue(), loadAdminDirectory(), refreshAdminPaymentStatus(),
+        loadAdminMarketplaceQueue(), loadAdminDirectory(), loadAdminCandidates(), refreshAdminPaymentStatus(),
         loadAdminInvoiceArtists(), loadAdminInvoices()
       ]);
       const failures = adminLoads.filter(result => result.status === "rejected");
@@ -867,6 +921,19 @@ document.getElementById("filters")?.addEventListener("click", event => {
   if (button) renderOpportunityCards(button.dataset.filter);
 });
 byId("submissionType")?.addEventListener("change", populateSubmissionTargets);
+
+byId("candidateReviewList")?.addEventListener("click", async event => {
+  const button = event.target.closest("button[data-candidate-review][data-candidate-id]");
+  if (!button) return;
+  button.disabled = true;
+  try {
+    await reviewAdminCandidate(button.dataset.candidateId, button.dataset.candidateReview);
+  } catch (error) {
+    setMessage("candidateReviewResult", error?.message || "Candidate review failed.", true);
+  } finally {
+    button.disabled = false;
+  }
+});
 byId("adminDirectoryList")?.addEventListener("click", event => {
   const button = event.target.closest("button[data-directory-edit]");
   if (button) editAdminDirectoryRecord(button.dataset.directoryEdit);
