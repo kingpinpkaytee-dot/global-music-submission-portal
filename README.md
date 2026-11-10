@@ -52,7 +52,7 @@ Connected frontend flows include:
 - Marketplace release sharing, public published-track/weekly Top 5 display, and a restricted admin Marketplace approval/decline queue.
 - Protected admin directory create/update, verification-evidence recording, listing publication and deactivation. Integration/acceptance flags are not user-editable and remain locked until a delivery adapter is deployed.
 
-No public verified directory entries are currently populated. Directory entries can be added by the admin, but credit-charged in-platform dispatch remains disabled until actual delivery adapters are deployed and enabled by trusted backend operations.
+Public directory counts are database-derived. Migration 0021 contains a previous public opportunity seed batch; verify the live database before quoting totals. The new migration 0024 batch is private and pending review. Credit-charged in-platform dispatch remains disabled until actual delivery adapters are deployed and enabled by trusted backend operations.
 
 Google OAuth still requires its provider and redirect URL to be configured in Supabase Auth. The browser code includes the OAuth flow, but availability must be confirmed in the Supabase dashboard. Spotify popularity is shown only from the dedicated `spotify_popularity` API field; no scraped or invented score is used. Playlist-follow verification remains disabled until the official playlist URL/ID and trusted verification process are configured.
 
