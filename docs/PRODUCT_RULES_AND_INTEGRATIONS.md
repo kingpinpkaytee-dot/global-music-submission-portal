@@ -122,3 +122,8 @@ A credit-charged portal submission may be enabled only after the corresponding d
 
 
 Migration 0025 adds a protected administrator review RPC and an admin workspace panel. Pending candidates can be rejected or explicitly approved after the administrator opens the evidence and checks the official route, current terms, contact details and genre fit. Approval creates a public, admin-verified directory listing with integration and acceptance flags still false. Duplicate candidates are marked duplicate and linked to the existing directory record. This process does not send music or charge credits.
+
+
+## Bulk publication of researched opportunities
+
+Migration 0026 adds an administrator-only bulk publication RPC for the pending candidate batch. It publishes candidates only when source/evidence URLs and a usable submission route or contact are present. Existing directory matches are marked as duplicates; incomplete records remain pending. The operation never enables delivery integration or credit charging. The 25 intended seed listings from migrations 0019–0021 remain a separate idempotent public seed batch. Production must apply migrations sequentially through 0026 before the new admin control is usable.
