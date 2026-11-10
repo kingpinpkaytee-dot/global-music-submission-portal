@@ -156,7 +156,7 @@ function evidence(category,title,snippet,html,url){
  return {ok:true,directPageEvidence:true,routeFound:true,categoryMatch:true};
 }
 function hostnameOf(value){
- try{return new URL(value).hostname.toLowerCase().replace(/^www\\./,"");}catch{return "";}
+ try{return new URL(value).hostname.toLowerCase().replace(/^www\./,"");}catch{return "";}
 }
 async function resolveGoogleNewsPublisher(hit){
  const title=cleanName(hit.title);
@@ -170,7 +170,7 @@ async function resolveGoogleNewsPublisher(hit){
   u.searchParams.set("q",'"'+title.replace(/["']/g," ")+'"');
   u.searchParams.set("count","10");
   const results=await fetchFeed(u,"Bing exact-headline resolution");
-  const terms=title.toLowerCase().split(/\\s+/).filter(x=>x.length>3).slice(0,6);
+  const terms=title.toLowerCase().split(/\s+/).filter(x=>x.length>3).slice(0,6);
   for(const item of results.slice(0,8)){
    let candidate=item.link;
    try{
@@ -203,14 +203,14 @@ async function resolveGoogleNewsPublisher(hit){
 }
 async function findIndependentCorroboration(category,name,primaryUrl,spotifyUrl){
  const primaryHost=hostnameOf(primaryUrl);
- const queryName=String(name||"").replace(/[^\\p{L}\\p{N} ]/gu," ").replace(/\\s+/g," ").trim().slice(0,100);
+ const queryName=String(name||"").replace(/[^\p{L}\p{N} ]/gu," ").replace(/\s+/g," ").trim().slice(0,100);
  if(!queryName)return {ok:false,reason:"No usable identity for second-source search"};
  const q=category==="playlist"
   ? `"${queryName}" Spotify playlist curator`
   : `"${queryName}" music submissions ${category==="radio_station"?"radio station":category==="blogger"?"music blog":"playlist curator"}`;
  let found;
  try{found=await search(q);}catch(e){return {ok:false,reason:"Independent search failed: "+String(e.message||e).slice(0,180)};}
- const terms=queryName.toLowerCase().split(/\\s+/).filter(x=>x.length>2).slice(0,3);
+ const terms=queryName.toLowerCase().split(/\s+/).filter(x=>x.length>2).slice(0,3);
  for(const hit of (found.items||[]).slice(0,8)){
   const url=hit.link;
   const host=hostnameOf(url);
