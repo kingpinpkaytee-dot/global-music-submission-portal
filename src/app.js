@@ -942,6 +942,7 @@ byId("publishAllCandidates")?.addEventListener("click", async event => {
     setMessage("candidateReviewResult", "Administrator access is required.", true);
     return;
   }
+  if (!window.confirm("Publish every eligible pending submission candidate to the public directory? Listings remain external-only; no artist submissions or credits will be dispatched.")) return;
   button.disabled = true;
   try {
     await publishAllPendingCandidates();
