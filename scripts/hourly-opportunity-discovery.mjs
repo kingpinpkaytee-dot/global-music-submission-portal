@@ -188,7 +188,7 @@ function extractPlaylistMetrics(value){
  ];
  let responseRate=null;
  for(const re of responsePatterns){const m=text.match(re);if(m){responseRate=Number(m[1]);if(Number.isFinite(responseRate))break;}}
- const activeEvidence=/(?:status|curator status|playlist status|account status)\s*[:\-]?\s*active\b|\bactive\s+(?:curator|playlist|profile)\b|\blast active\b|\bcurrently active\b/i.test(text);
+ const activeEvidence=/(?:status|curator status|playlist status|account status)\s*[:\-]?\s*active\b|\bactive\s+(?:curator|playlist|profile)\b|\blast active\s*(?:today|yesterday|[0-9]{1,2}\s+(?:hours?|days?)\s+ago)\b|\bactive within (?:[0-9]{1,2} days?|30 days)\b|\bcurrently active\b/i.test(text);
  const inactiveEvidence=/\b(?:inactive|paused|closed|disabled|not active)\b/i.test(text);
  return {followerCount,responseRate,activityStatus:activeEvidence&&!inactiveEvidence?"active":"unknown",activeEvidence,inactiveEvidence};
 }
