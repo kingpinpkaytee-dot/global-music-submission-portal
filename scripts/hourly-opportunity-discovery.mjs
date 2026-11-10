@@ -1,6 +1,8 @@
-// Public web-search discovery for Artist Frequency (Bing RSS + Google News RSS).
-// Candidates are queued for administrator review. This worker never publishes
-// directory entries or enables submissions.
+// Global music-opportunity discovery for Artist Frequency.
+// Public playlist discovery target: 18,000+ unique opportunities over time.
+// The target is a research backlog goal, NOT a claim about Spotify's playlist count.
+// Auto-publication remains gated by fresh publisher-page evidence AND independent
+// second-source corroboration. Published listings never enable in-platform submissions.
 const SUPABASE_URL=process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
 if(![SUPABASE_URL,SERVICE_ROLE_KEY].every(Boolean)) throw new Error("Missing required Supabase configuration.");
@@ -11,16 +13,27 @@ if(SERVICE_ROLE_KEY.startsWith("sb_publishable_")||SERVICE_ROLE_KEY.startsWith("
 if(!isNewSecretKey&&SERVICE_ROLE_KEY.split(".").length!==3) throw new Error("SUPABASE_SERVICE_ROLE_KEY must be an sb_secret_* key or a legacy three-part service_role JWT.");
 const headers={apikey:SERVICE_ROLE_KEY,...(isNewSecretKey?{}:{Authorization:"Bearer "+SERVICE_ROLE_KEY}),"Content-Type":"application/json"};
 // Exact-phrase searches avoid dictionary matches on the word "submit".
+const playlistRegions=[
+ "South Africa","Nigeria","Ghana","Kenya","Tanzania","Uganda",
+ "United Kingdom","United States","Canada","Brazil","Mexico","Argentina",
+ "Germany","France","Netherlands","Sweden","Spain","Italy",
+ "India","Japan","South Korea","Australia","New Zealand",
+ "Jamaica","Trinidad and Tobago","France","Portugal","Poland"
+];
+const playlistGenres=["Amapiano","Afro House","Deep House","Afrobeats","Melodic House","Organic House"];
+const playlistQueries=playlistRegions.slice(0,18).map((region,index)=>({
+ category:"playlist",
+ q:`"${playlistGenres[index%playlistGenres.length]}" Spotify playlist curator "${region}" "submit music" OR "submit your track" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:spotify.com -site:submittable.com -jobs -definition`
+}));
 const queries=[
- {category:"playlist",q:'"free Spotify playlist submission" curator "submit music" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:thefreedictionary.com -site:dictionary.com -site:spotify.com -site:submittable.com -jobs -definition'},
- {category:"playlist",q:'"submit your track" "Spotify playlist" curator form -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:spotify.com -guide -definition'},
+ ...playlistQueries,
  {category:"radio_station",q:'"music submissions" "radio station" "send music" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -jobs -directory'},
  {category:"radio_station",q:'"submit music" radio "music director" "submission form" -site:dictionary.cambridge.org -site:merriam-webster.com -jobs -definition'},
  {category:"blogger",q:'"send us your music" "music blog" submissions -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -jobs'},
  {category:"blogger",q:'"music blog" "submit music" "submission guidelines" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -howto'},
  {category:"curator",q:'"playlist curator" "free submissions" Spotify "submit" -site:dictionary.cambridge.org -site:merriam-webster.com -site:spotify.com -definition'},
  {category:"curator",q:'"Spotify playlist" "accepting submissions" curator -site:dictionary.cambridge.org -site:merriam-webster.com -site:spotify.com -guide'}
-];
+];;
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
  const res=await fetch(url,{...options,signal:AbortSignal.timeout(15000)});
@@ -84,7 +97,7 @@ async function search(q){
  for(let i=0;i<results.length;i++){
   const r=results[i],name=providers[i].name;
   if(r.status!=="fulfilled"){stats[name]={count:0,error:String(r.reason?.message||r.reason).slice(0,500)};continue;}
-  const items=r.value.items.slice(0,12);
+  const items=r.value.items.slice(0,20);
   stats[name]={count:items.length,error:null};
   const bucket=[];
   for(const hit of items){
@@ -105,9 +118,9 @@ async function search(q){
     const key=u.toString().replace(/\/$/,"").toLowerCase();
     if(seen.has(key))continue;seen.add(key);unique.push(hit);
    }catch{}
-   if(unique.length>=12)break;
+   if(unique.length>=20)break;
   }
-  if(unique.length>=12)break;
+  if(unique.length>=20)break;
  }
  return {items:unique,providerStats:stats};
 }
@@ -142,6 +155,41 @@ function evidence(category,title,snippet,html,url){
  if(category==="curator"&&!/(playlist|curator|spotify)/i.test(page))return {ok:false,reason:"No playlist-curator identity on inspected publisher page"};
  return {ok:true,directPageEvidence:true,routeFound:true,categoryMatch:true};
 }
+function hostnameOf(value){
+ try{return new URL(value).hostname.toLowerCase().replace(/^www\\./,"");}catch{return "";}
+}
+async function findIndependentCorroboration(category,name,primaryUrl,spotifyUrl){
+ const primaryHost=hostnameOf(primaryUrl);
+ const queryName=String(name||"").replace(/[^\\p{L}\\p{N} ]/gu," ").replace(/\\s+/g," ").trim().slice(0,100);
+ if(!queryName)return {ok:false,reason:"No usable identity for second-source search"};
+ const q=category==="playlist"
+  ? `"${queryName}" Spotify playlist curator`
+  : `"${queryName}" music submissions ${category==="radio_station"?"radio station":category==="blogger"?"music blog":"playlist curator"}`;
+ let found;
+ try{found=await search(q);}catch(e){return {ok:false,reason:"Independent search failed: "+String(e.message||e).slice(0,180)};}
+ const terms=queryName.toLowerCase().split(/\\s+/).filter(x=>x.length>2).slice(0,3);
+ for(const hit of (found.items||[]).slice(0,8)){
+  const url=hit.link;
+  const host=hostnameOf(url);
+  if(!host||host===primaryHost||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
+  const inspected=await inspect(url);
+  if(!inspected.ok)continue;
+  const html=String(inspected.html||"").slice(0,180000);
+  const textContent=stripTags(html).toLowerCase();
+  const identityMatch=(spotifyUrl&&html.includes(spotifyUrl))||terms.filter(t=>textContent.includes(t)).length>=Math.min(2,terms.length);
+  const categoryMatch=category==="playlist"
+    ? /(spotify|playlist|curator)/i.test(textContent)
+    : category==="radio_station"
+      ? /(radio|broadcast|fm|station)/i.test(textContent)
+      : category==="blogger"
+        ? /(music blog|magazine|music review|editorial)/i.test(textContent)
+        : /(playlist|curator|spotify)/i.test(textContent);
+  if(identityMatch&&categoryMatch&&hostnameOf(inspected.finalUrl||url)!==primaryHost){
+   return {ok:true,url:inspected.finalUrl||url,host:hostnameOf(inspected.finalUrl||url),identityMatch:true,categoryMatch:true,reachable:true};
+  }
+ }
+ return {ok:false,reason:"No reachable, identity-matching independent source found"};
+}
 async function main(){
  let autoPublicationEnabled=true;
  try{await rest("opportunity_discovery_candidates?select=auto_verification&limit=0");}
@@ -161,7 +209,7 @@ async function main(){
     if(categorySeen.has(categoryKey))continue;
     categorySeen.add(categoryKey);
     processedByCategory[item.category]=(processedByCategory[item.category]||0)+1;
-    if(processedByCategory[item.category]>12)continue;
+    if(processedByCategory[item.category]>(item.category==="playlist"?180:12))continue;
     seen++;let url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
     // Follow Google News RSS redirects once; retain only real publisher destinations.
@@ -182,6 +230,7 @@ async function main(){
     const ev=page.ok?evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url):{ok:false,reason:page.reason||"Destination could not be inspected; manual review required"};
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
+    const corroboration=ev.ok?await findIndependentCorroboration(item.category,name,finalUrl,ev.spotifyUrl||null):{ok:false,reason:"Primary publisher-page checks did not pass"};
     const searchable=(name+" "+(hit.snippet||"")+" "+(page.html||"").slice(0,30000)).toLowerCase();
     let host="",path="";
     try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\./,"");path=parsed.pathname.toLowerCase();}catch{}
@@ -212,7 +261,7 @@ async function main(){
       submission_url:ev.ok?finalUrl:null,
       evidence:("Title: "+name+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Automatic check: "+(ev.ok?"passed; administrator verification still required":ev.reason)).slice(0,1800),
       verification_status:"pending",
-      verification_reason:ev.ok?"Automatic checks passed; administrator review required":ev.reason+"; retained for administrator review"})
+      verification_reason:ev.ok?(corroboration.ok?"Publisher evidence and independent corroboration passed; automatic publication is still gated by database policy":"Publisher evidence passed, but independent corroboration was not found; administrator review required"):ev.reason+"; retained for administrator review"})
     });
     const existing=await rest("opportunity_discovery_candidates?select=id,name,category,source_url,website_url,submission_url,review_status,activity_status&category=eq."+encodeURIComponent(item.category)+"&source_url=eq."+encodeURIComponent(finalUrl)+"&limit=1");
     if(existing&&existing.length){duplicates++;duplicateDetails.push(existing[0]);continue;}
@@ -223,11 +272,13 @@ async function main(){
      accepts_free_submissions:false,
      activity_status:"unknown",source_name:"Public Web Search (Bing RSS / Google News RSS)",
      source_url:finalUrl,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending",
-     ...(autoPublicationEnabled?{auto_verification:ev.ok?{schema_version:"1",score:96,reachable:true,direct_page_evidence:true,
+     ...(autoPublicationEnabled?{auto_verification:ev.ok&&corroboration.ok?{schema_version:"1",score:98,reachable:true,direct_page_evidence:true,
       submission_route_found:true,category_match:true,canonical_destination:true,
+      independent_corroboration:true,independent_source_reachable:true,
+      independent_identity_match:true,independent_source_url:corroboration.url,
       individual_playlist_url:ev.spotifyUrl||null,verified_at:now(),
-      verification_method:"live HTTP inspection of publisher page; submission language and route found on page"}:null,
-      auto_verified_at:ev.ok?now():null}:{})};
+      verification_method:"live publisher-page inspection plus independent reachable source corroborating identity and category"}:null,
+      auto_verified_at:ev.ok&&corroboration.ok?now():null}:{})};
     const inserted=await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(candidate)});
     const saved=Array.isArray(inserted)?inserted[0]:null;
     if(!saved?.id)throw new Error("Candidate insert did not return an ID; automatic publication withheld");
@@ -248,7 +299,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
