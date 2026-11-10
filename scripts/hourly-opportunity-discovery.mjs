@@ -25,15 +25,38 @@ const playlistQueries=playlistRegions.slice(0,18).map((region,index)=>({
  category:"playlist",
  q:`"${playlistGenres[index%playlistGenres.length]}" Spotify playlist curator "${region}" "submit music" OR "submit your track" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:spotify.com -site:submittable.com -jobs -definition`
 }));
+const platformPlaylistQueries=[
+ {category:"playlist",dsp:"Spotify",q:'site:open.spotify.com/playlist Amapiano OR "Afro House" OR "Deep House" playlist'},
+ {category:"playlist",dsp:"YouTube",q:'site:youtube.com/playlist Amapiano OR "Afro House" OR "Deep House" playlist'},
+ {category:"playlist",dsp:"YouTube Music",q:'site:music.youtube.com/playlist Amapiano OR "Afro House" OR "Deep House"'},
+ {category:"playlist",dsp:"Apple Music",q:'site:music.apple.com playlist Amapiano OR "Afro House" OR "Deep House"'},
+ {category:"playlist",dsp:"Deezer",q:'site:deezer.com playlist Amapiano OR "Afro House" OR "Deep House"'},
+ {category:"playlist",dsp:"Tidal",q:'site:tidal.com/browse/playlist Amapiano OR "Afro House" OR "Deep House"'},
+ {category:"playlist",dsp:"SubmitHub",q:'site:submithub.com playlist curator submit music Amapiano OR Afro House OR Deep House'},
+ {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com playlist submission Amapiano OR Afro House OR Deep House'},
+ {category:"playlist",dsp:"Daily Playlists",q:'site:dailyplaylists.com playlist submit music Amapiano OR Afro House OR Deep House'}
+];
+const portalQueries=[
+ {category:"platform",q:'music submission portal independent artists playlist curator submit music official'},
+ {category:"platform",q:'music promotion platform playlist submission radio blogger curator submit track official'},
+ {category:"platform",q:'site:groover.co music curator playlist radio blog submit music'},
+ {category:"platform",q:'site:indiemono.com music submit playlist curator'},
+ {category:"platform",q:'site:submitlink.io playlist curator submit track music'},
+ {category:"platform",q:'site:playlistdock.com playlist curator submit music'},
+ {category:"platform",q:'site:audiartist.com music submission playlist radio curator'}
+];
 const queries=[
- ...playlistQueries,
- {category:"radio_station",q:'"music submissions" "radio station" "send music" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -jobs -directory'},
- {category:"radio_station",q:'"submit music" radio "music director" "submission form" -site:dictionary.cambridge.org -site:merriam-webster.com -jobs -definition'},
- {category:"blogger",q:'"send us your music" "music blog" submissions -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -jobs'},
- {category:"blogger",q:'"music blog" "submit music" "submission guidelines" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -howto'},
- {category:"curator",q:'"playlist curator" "free submissions" Spotify "submit" -site:dictionary.cambridge.org -site:merriam-webster.com -site:spotify.com -definition'},
- {category:"curator",q:'"Spotify playlist" "accepting submissions" curator -site:dictionary.cambridge.org -site:merriam-webster.com -site:spotify.com -guide'}
-];;
+ ...playlistQueries,...platformPlaylistQueries,
+ {category:"radio_station",q:'"music submissions" "radio station" "send music" official station submission form -jobs -directory'},
+ {category:"radio_station",q:'"submit music" radio "music director" "submission form" official station'},
+ {category:"radio_station",q:'radio station artist submissions music submission contact email FM official'},
+ {category:"blogger",q:'"send us your music" "music blog" submissions official contact'},
+ {category:"blogger",q:'"music blog" "submit music" "submission guidelines" independent artist'},
+ {category:"blogger",q:'music magazine blog artist music submissions review submit track contact'},
+ {category:"curator",q:'"playlist curator" "free submissions" Spotify "submit" official'},
+ {category:"curator",q:'"Spotify playlist" "accepting submissions" curator submit track official'},
+ ...portalQueries
+];
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
  const res=await fetch(url,{...options,signal:AbortSignal.timeout(15000)});
@@ -139,20 +162,43 @@ function extractEmail(html){
  const found=[...String(html||"").matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig)].map(x=>x[0].toLowerCase());
  return found.find(e=>/(music|submit|demo|artist|press|radio|playlist)/i.test(e))||null;
 }
+function detectDspPlaylistUrl(value){
+ const raw=String(value||"");
+ const patterns=[
+  ["Spotify",/https?:\/\/(?:open\.)?spotify\.com\/playlist\/[A-Za-z0-9]+/i],
+  ["YouTube Music",/https?:\/\/music\.youtube\.com\/playlist\?list=[A-Za-z0-9_-]+/i],
+  ["YouTube",/https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=[A-Za-z0-9_-]+/i],
+  ["Apple Music",/https?:\/\/music\.apple\.com\/[^\s"'<>]+\/playlist\/[^\s"'<>]+/i],
+  ["Deezer",/https?:\/\/(?:www\.)?deezer\.com\/(?:[a-z]{2}\/)?playlist\/[0-9]+/i],
+  ["Tidal",/https?:\/\/(?:www\.)?tidal\.com\/browse\/playlist\/[A-Za-z0-9-]+/i]
+ ];
+ for(const [dsp,re] of patterns){const m=raw.match(re);if(m)return {dsp,url:m[0].replace(/[),.;]+$/,"")};}
+ return null;
+}
+function extractDspPlaylist(html,url,snippet){
+ const direct=detectDspPlaylistUrl(url);if(direct)return direct;
+ const haystack=String(html||"")+" "+String(snippet||"");
+ const links=[...haystack.matchAll(/https?:\/\/[^\s"'<>]+/gi)].map(m=>decodeHtml(m[0]));
+ for(const link of links){const found=detectDspPlaylistUrl(link);if(found)return found;}
+ return null;
+}
 function evidence(category,title,snippet,html,url){
  const page=String(html||"").slice(0,150000).toLowerCase();
+ if(category==="playlist"){
+  const dspPlaylist=extractDspPlaylist(html,url,snippet);
+  if(!dspPlaylist)return {ok:false,reason:"No individual public DSP playlist URL found"};
+  const hasSubmissionLanguage=/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here|accepting submissions)/i.test(page);
+  const route=/<form\b/i.test(page)||/mailto:/i.test(page)||/href\s*=\s*["'][^"']*(submit|submission|demo|upload|pitch)[^"']*["']/i.test(page)||/\/(submit|submission|demo|music-upload|pitch)(\/|\?|$)/i.test(url);
+  return {ok:hasSubmissionLanguage&&route,reason:hasSubmissionLanguage&&route?null:"Playlist found; submission route not independently confirmed",playlistUrl:dspPlaylist.url,dspName:dspPlaylist.dsp,directPlaylist:true,routeFound:route,categoryMatch:true};
+ }
  if(!/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here|accepting submissions)/i.test(page))
   return {ok:false,reason:"Inspected publisher page has no explicit music-submission evidence"};
  const route=/<form\b/i.test(page)||/mailto:/i.test(page)||/href\s*=\s*["'][^"']*(submit|submission|demo|upload|pitch)[^"']*["']/i.test(page)||/\/(submit|submission|demo|music-upload|pitch)(\/|\?|$)/i.test(url);
  if(!route)return {ok:false,reason:"No identifiable submission route on inspected publisher page"};
- if(category==="playlist"){
-  const spotify=page.match(/https?:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/i);
-  if(!spotify)return {ok:false,reason:"No individual Spotify playlist URL on inspected publisher page"};
-  return {ok:true,spotifyUrl:spotify[0],directPageEvidence:true,routeFound:true,categoryMatch:true};
- }
  if(category==="radio_station"&&!/(radio|broadcast|fm|station)/i.test(page))return {ok:false,reason:"No radio-station identity on inspected publisher page"};
  if(category==="blogger"&&!/(music blog|blog|magazine|editorial|music review|press)/i.test(page))return {ok:false,reason:"No music-editorial identity on inspected publisher page"};
  if(category==="curator"&&!/(playlist|curator|spotify)/i.test(page))return {ok:false,reason:"No playlist-curator identity on inspected publisher page"};
+ if(category==="platform"&&!/(music|playlist|radio|blog|curator|artist)/i.test(page))return {ok:false,reason:"No music-submission platform identity on inspected page"};
  return {ok:true,directPageEvidence:true,routeFound:true,categoryMatch:true};
 }
 function hostnameOf(value){
@@ -201,12 +247,12 @@ async function resolveGoogleNewsPublisher(hit){
  }catch{}
  return null;
 }
-async function findIndependentCorroboration(category,name,primaryUrl,spotifyUrl){
+async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl,dspName){
  const primaryHost=hostnameOf(primaryUrl);
  const queryName=String(name||"").replace(/[^\p{L}\p{N} ]/gu," ").replace(/\s+/g," ").trim().slice(0,100);
  if(!queryName)return {ok:false,reason:"No usable identity for second-source search"};
  const q=category==="playlist"
-  ? `"${queryName}" Spotify playlist curator`
+  ? `"${queryName}" ${dspName||"music"} playlist curator`
   : `"${queryName}" music submissions ${category==="radio_station"?"radio station":category==="blogger"?"music blog":"playlist curator"}`;
  let found;
  try{found=await search(q);}catch(e){return {ok:false,reason:"Independent search failed: "+String(e.message||e).slice(0,180)};}
@@ -219,14 +265,16 @@ async function findIndependentCorroboration(category,name,primaryUrl,spotifyUrl)
   if(!inspected.ok)continue;
   const html=String(inspected.html||"").slice(0,180000);
   const textContent=stripTags(html).toLowerCase();
-  const identityMatch=(spotifyUrl&&html.includes(spotifyUrl))||terms.filter(t=>textContent.includes(t)).length>=Math.min(2,terms.length);
+  const identityMatch=(playlistUrl&&html.includes(playlistUrl))||terms.filter(t=>textContent.includes(t)).length>=Math.min(2,terms.length);
   const categoryMatch=category==="playlist"
     ? /(spotify|playlist|curator)/i.test(textContent)
     : category==="radio_station"
       ? /(radio|broadcast|fm|station)/i.test(textContent)
       : category==="blogger"
         ? /(music blog|magazine|music review|editorial)/i.test(textContent)
-        : /(playlist|curator|spotify)/i.test(textContent);
+        : category==="platform"
+          ? /(music submission|submission portal|playlist|radio|blog|curator)/i.test(textContent)
+          : /(playlist|curator|spotify)/i.test(textContent);
   if(identityMatch&&categoryMatch&&hostnameOf(inspected.finalUrl||url)!==primaryHost){
    return {ok:true,url:inspected.finalUrl||url,host:hostnameOf(inspected.finalUrl||url),identityMatch:true,categoryMatch:true,reachable:true};
   }
@@ -276,23 +324,24 @@ async function main(){
      let finalHost="";try{finalHost=new URL(page.finalUrl||url).hostname.toLowerCase();}catch{}
      if(finalHost==="news.google.com"||finalHost.endsWith(".news.google.com"))page={ok:false,reason:"Google News wrapper did not expose a publisher destination"};
     }
-    const ev=page.ok?evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url):{ok:false,reason:page.reason||"Destination could not be inspected; manual review required"};
+    const ev=evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url);
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
-    const corroboration=ev.ok?await findIndependentCorroboration(item.category,name,finalUrl,ev.spotifyUrl||null):{ok:false,reason:"Primary publisher-page checks did not pass"};
+    const corroboration=ev.ok?await findIndependentCorroboration(item.category,name,finalUrl,ev.playlistUrl||null,ev.dspName||item.dsp||null):{ok:false,reason:"Primary publisher-page checks did not pass"};
     const searchable=(name+" "+(hit.snippet||"")+" "+(page.html||"").slice(0,30000)).toLowerCase();
     let host="",path="";
     try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\./,"");path=parsed.pathname.toLowerCase();}catch{}
     const genericRadioDirectories=["iheart.com","accuradio.com","radio.net","mytuner-radio.com","appradiofm.com","tunein.com","radio.garden"];
     const genericRadioLanding=genericRadioDirectories.some(domain=>host===domain||host.endsWith("."+domain))&&
       (path==="/"||/^\/(live|radio|home|stations?)\/?$/.test(path));
-    const spotifyDestination=host==="spotify.com"||host.endsWith(".spotify.com")||host==="spotify.link"||host.endsWith(".spotify.link");
+    const dspDestination=!!detectDspPlaylistUrl(finalUrl);
     const submissionEvidence=ev.ok===true;
     const categoryRelevant={
-     playlist:!spotifyDestination&&submissionEvidence&&!!ev.spotifyUrl&&/(playlist|curator|submit)/i.test(searchable),
-     curator:!spotifyDestination&&submissionEvidence&&/(playlist curator|curator|submit.*playlist|playlist.*submit)/i.test(searchable),
+     playlist:!!ev.playlistUrl&&(submissionEvidence||ev.directPlaylist)&&/(playlist|curator|submit|mix|radio)/i.test(searchable),
+     curator:!dspDestination&&submissionEvidence&&/(playlist curator|curator|submit.*playlist|playlist.*submit)/i.test(searchable),
      radio_station:!genericRadioLanding&&submissionEvidence&&/(radio|broadcast|fm|station)/i.test(searchable),
-     blogger:submissionEvidence&&/(music blog|blog|magazine|editorial|music review)/i.test(searchable)&&!/(submithub|submitlink|playlistdock|indiemono|audiartist)/i.test(host)
+     blogger:submissionEvidence&&/(music blog|blog|magazine|editorial|music review)/i.test(searchable)&&!/(submithub|submitlink|playlistdock|indiemono|audiartist)/i.test(host),
+     platform:submissionEvidence&&/(music submission|submission portal|playlist|radio|blog|curator|submit)/i.test(searchable)
     }[item.category]===true;
     if(!categoryRelevant){
      rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",spotifyDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
@@ -305,18 +354,24 @@ async function main(){
      method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
      body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
       submission_url:ev.ok?finalUrl:null,
-      evidence:("Title: "+name+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Automatic check: "+(ev.ok?"passed; administrator verification still required":ev.reason)).slice(0,1800),
+      evidence:("Title: "+name+playlistData+" | Genres: "+(extractedGenres.join(", ")||"not reliably extracted")+" | Followers: "+(followerCount??"not verified")+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Submission route: "+(ev.ok?"confirmed":ev.reason||"not confirmed")+" | Automatic check: "+(corroboration.ok?"independent source matched":"manual review required")).slice(0,1800),
       verification_status:"pending",
       verification_reason:ev.ok?(corroboration.ok?"Publisher evidence and independent corroboration passed; automatic publication is still gated by database policy":"Publisher evidence passed, but independent corroboration was not found; administrator review required"):ev.reason+"; retained for administrator review"})
     });
     const existing=await rest("opportunity_discovery_candidates?select=id,name,category,source_url,website_url,submission_url,review_status,activity_status&category=eq."+encodeURIComponent(item.category)+"&source_url=eq."+encodeURIComponent(finalUrl)+"&limit=1");
     if(existing&&existing.length){duplicates++;duplicateDetails.push(existing[0]);continue;}
     const html=page.html||"",email=extractEmail(html);
-    const candidate={category:item.category,name,country:null,dsp_name:item.category==="playlist"?"Spotify":null,
-     genres:[],website_url:finalUrl,submission_url:ev.ok?finalUrl:null,contact_email:email,
+    const lowerText=(name+" "+(hit.snippet||"")+" "+html.slice(0,50000)).toLowerCase();
+    const knownGenres=["Amapiano","Afro House","Afrobeats","Deep House","Melodic House","Organic House","Hip Hop","R&B","Techno","Pop","Dance","Gospel"];
+    const extractedGenres=knownGenres.filter(g=>lowerText.includes(g.toLowerCase()));
+    const followerMatch=lowerText.match(/([0-9][0-9,.]*\s*[kmb]?)\s*(?:followers|subscribers)/i);
+    const followerCount=followerMatch?(()=>{const raw=followerMatch[1].replace(/,/g,"").replace(/\s/gi,"").toLowerCase();const n=parseFloat(raw);return Number.isFinite(n)?Math.round(n*(raw.endsWith("k")?1000:raw.endsWith("m")?1000000:raw.endsWith("b")?1000000000:1)):null;})():null;
+    const playlistData=ev.playlistUrl?(" | DSP playlist: "+ev.dspName+" "+ev.playlistUrl):"";
+    const candidate={category:item.category,name,country:item.region||null,dsp_name:ev.dspName||item.dsp||(item.category==="playlist"?"Spotify":null),
+     genres:extractedGenres,website_url:ev.playlistUrl||finalUrl,submission_url:ev.ok?finalUrl:null,contact_email:email,
      submission_method:email?"email":(ev.ok?(/mailto:/i.test(html)?"email":"form"):"unknown"),
-     accepts_free_submissions:false,
-     activity_status:"unknown",source_name:"Public Web Search (Bing RSS / Google News RSS)",
+     accepts_free_submissions:false,follower_count:followerCount,
+     activity_status:"unknown",source_name:(hit.provider||"Public Web Search")+(item.dsp?" / "+item.dsp:""),
      source_url:finalUrl,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending",
      ...(autoPublicationEnabled?{auto_verification:ev.ok&&corroboration.ok?{schema_version:"1",score:98,reachable:true,direct_page_evidence:true,
       submission_route_found:true,category_match:true,canonical_destination:true,
