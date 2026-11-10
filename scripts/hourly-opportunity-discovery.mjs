@@ -109,7 +109,7 @@ function evidence(category,title,snippet,html,url){
 }
 async function main(){
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const duplicateDetails=[];const errors=[];
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];
  for(const item of queries){
   try{
    const hits=await search(item.q);done++;
@@ -135,6 +135,7 @@ async function main(){
      blogger:submissionEvidence&&/(music blog|blog|magazine|editorial|music review)/i.test(searchable)
     }[item.category]===true;
     if(!categoryRelevant){
+     rejectedDetails.push({category:item.category,name,url:finalUrl,evidenceReason:ev.reason||"Evidence passed but category relevance check failed",spotifyDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
      await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
       method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
       body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
@@ -161,7 +162,7 @@ async function main(){
      activity_status:"unknown",source_name:"Public Web Search (Bing RSS / Google News RSS / DuckDuckGo)",
      source_url:url,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending"};
     await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(candidate)});
-    queued++;
+    queued++;queuedDetails.push({category:item.category,name,source_url:url,submission_url:candidate.submission_url,contact_email:email});
    }
   }catch(e){errors.push(item.category+": "+e.message);}
  }
@@ -169,7 +170,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:0,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),duplicateDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
