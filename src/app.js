@@ -143,7 +143,7 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
     const linkLabel = item.category === "playlist" ? "Submit track ↗" : "View destination ↗";
     const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">' + linkLabel + '</a></p>' : "";
     const email = String(item.contact_email || "").trim();
-    const emailHtml = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)
+    const emailHtml = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
       ? '<p class="form-note">Verified contact: <a href="mailto:' + escapeHtml(email) + '">' + escapeHtml(email) + '</a></p>' : "";
     return '<article class="opportunity"><div class="award"><span class="award-mark">🏆</span> VERIFIED & APPROVED</div><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + curatorHtml + emailHtml + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + spotifyLinkHtml + linkHtml + '</article>';
   }).join("");
