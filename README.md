@@ -121,3 +121,13 @@ See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md`, `
 The website's Google Programmable Search Element remains a user-facing search box. The hourly worker uses Google's Custom Search JSON API only if the Google Cloud project is entitled to that legacy API. Google closed Custom Search JSON API access to new customers on 20 January 2026 and has announced retirement on 1 January 2027. An API key and Search Engine ID alone do not prove entitlement. If the worker receives 403 access-denied responses, the project must use an eligible Google-supported alternative; do not scrape Google result pages or claim automated search is running.
 
 The discovery worker now queues candidates for admin review only. It performs four searches per hourly run (96 per day at the configured schedule), within Google's documented 100-query daily free allowance for eligible legacy API customers. It does not insert or update public directory records, does not set verified/public flags, and never enables in-platform submissions. Migration 0024 stages 27 source-backed research candidates found through Google Search; they remain pending until a human checks their current submission route, terms, recipient and genre fit. Contact emails and external forms are displayed as information only until a real, tested delivery adapter is configured.
+
+
+## Opportunity publication batch (migration 0026)
+
+- Migrations 0019–0021 contain 25 intended public seed listings (3 + 6 + 16) and use idempotent inserts.
+- Migration 0024 stages 27 researched candidates privately for administrator review.
+- Migration 0026 adds the administrator-only `admin_publish_all_pending_opportunity_candidates()` RPC and the admin workspace bulk-publish control.
+- The bulk action publishes only candidates with source evidence and a submission URL or public contact email; duplicates are linked to existing directory rows and incomplete candidates remain pending.
+- Published records are public, active and administrator-approved, but `is_integrated=false` and `accepts_submissions=false`; external links are visible, while credit-charged in-platform dispatch remains disabled.
+- Apply migrations in sequence through 0026 before using the bulk-publish control. GitHub commits alone do not apply production database migrations or deploy the website.
