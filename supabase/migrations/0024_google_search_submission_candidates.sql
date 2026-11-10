@@ -83,7 +83,16 @@ FROM (VALUES
   'https://app.bayfm.co.za/'),
  ('contact','Wild Dogs Radio — Music submissions contact','United States',NULL::text,ARRAY['Radio submissions']::text[],
   'https://wilddogsradio.com/','https://wilddogsradio.com/music-submissions/','office@wilddogsradio.com','email',true,
-  'https://wilddogsradio.com/music-submissions/')
+  'https://wilddogsradio.com/music-submissions/'),
+ ('playlist','Afro House Essentials | 2026','Global','Spotify',ARRAY['Afro House']::text[],
+  'https://open.spotify.com/playlist/5yzND7XsDIzBYIBKu42LJw','https://play.soundplate.com/afrhdc',NULL::text,'portal',true,
+  'https://soundplate.com/afro-house-dancin-spotify-playlist-submit-music-here/'),
+ ('playlist','Amapiano Grooves - The House of Sgidongo','Global','Spotify',ARRAY['Amapiano','Sgija']::text[],
+  'https://open.spotify.com/playlist/6mEYyf2jrLiA3YgPdxV13W','https://play.soundplate.com/pianosexual',NULL::text,'portal',true,
+  'https://soundplate.com/pianosexual-amapiano-sgija-every-friday-0000-new-music-spotify-playlist-submit-music-here/'),
+ ('playlist','Beach Vibes - Chill House Playlist','Global','Spotify',ARRAY['Tropical House','Deep House','Amapiano','Afrobeats']::text[],
+  'https://open.spotify.com/playlist/0pvSK8VymG36atzmXHZXMC','https://play.soundplate.com/bvchspl',NULL::text,'portal',true,
+  'https://soundplate.com/beach-vibes-chill-spotify-playlist-submit-music-here/')
 ) AS v(category,name,country,dsp_name,genres,website_url,submission_url,contact_email,submission_method,accepts_free_submissions,source_url)
 WHERE NOT EXISTS (
  SELECT 1 FROM public.opportunity_discovery_candidates c
