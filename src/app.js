@@ -650,7 +650,7 @@ function renderAdminCandidates() {
     const link = safeHttpUrl(item.submission_url || item.website_url || item.source_url);
     const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Open submission evidence ↗</a>' : "";
     const email = String(item.contact_email || "").trim();
-    const emailHtml = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)
+    const emailHtml = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
       ? '<p class="form-note">Contact: <a href="mailto:' + escapeHtml(email) + '">' + escapeHtml(email) + '</a></p>' : "";
     const tags = [item.country || "Global", ...(item.genres || []), item.submission_method || "route unknown",
       item.accepts_free_submissions ? "Free route stated" : "Fee not confirmed"].map(x => '<span class="tag">' + escapeHtml(x) + '</span>').join(" ");
