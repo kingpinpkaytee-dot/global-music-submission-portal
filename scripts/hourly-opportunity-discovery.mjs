@@ -117,25 +117,42 @@ async function main(){
     seen++;const url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
     const page=await inspect(url);
-    const ev=page.ok?evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url):{ok:false,reason:page.reason||"Unreachable"};
+    const ev=page.ok?evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url):{ok:false,reason:page.reason||"Destination could not be inspected; manual review required"};
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
+    const searchable=(name+" "+(hit.snippet||"")+" "+(page.html||"").slice(0,30000)).toLowerCase();
+    const categoryRelevant={
+     playlist:/(spotify|playlist|curator|submit|music)/i.test(searchable),
+     curator:/(spotify|playlist|curator|submit|music)/i.test(searchable),
+     radio_station:/(radio|broadcast|fm|station|submit|music)/i.test(searchable),
+     blogger:/(music blog|blog|magazine|editorial|music review|submit|artist|demo)/i.test(searchable)
+    }[item.category]===true;
+    if(!categoryRelevant){
+     await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
+      method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
+      body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
+       submission_url:null,evidence:(hit.title+" — "+(hit.snippet||"")).slice(0,1800),
+       verification_status:"rejected",verification_reason:"Search result did not contain enough category-specific relevance; excluded from admin queue"})
+     });
+     rejected++;continue;
+    }
     await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
      method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
      body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
-      submission_url:page.ok?finalUrl:null,evidence:(hit.snippet||"").slice(0,1800),
-      verification_status:"pending",verification_reason:ev.ok?"Automatic checks passed; admin review required":ev.reason})
+      submission_url:ev.ok?finalUrl:null,
+      evidence:("Title: "+name+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Automatic check: "+(ev.ok?"passed; administrator verification still required":ev.reason)).slice(0,1800),
+      verification_status:"pending",
+      verification_reason:ev.ok?"Automatic checks passed; administrator review required":ev.reason+"; retained for administrator review"})
     });
-    if(!ev.ok){rejected++;continue;}
     const existing=await rest("opportunity_discovery_candidates?select=id&category=eq."+encodeURIComponent(item.category)+"&source_url=eq."+encodeURIComponent(url)+"&limit=1");
     if(existing&&existing.length)continue;
     const html=page.html||"",email=extractEmail(html);
     const candidate={category:item.category,name,country:null,dsp_name:item.category==="playlist"?"Spotify":null,
-     genres:[],website_url:ev.spotifyUrl||finalUrl,submission_url:finalUrl,contact_email:email,
-     submission_method:email||/mailto:/i.test(html)?"email":"form",
-     accepts_free_submissions:/free (submission|to submit|music submissions)|no fee|always free/i.test(html+" "+(hit.snippet||"")),
-     activity_status:"active",source_name:"Public Web Search (Bing RSS / DuckDuckGo)",source_url:url,
-     evidence_url:finalUrl,first_seen_at:now(),last_checked_at:now(),review_status:"pending"};
+     genres:[],website_url:ev.spotifyUrl||finalUrl,submission_url:ev.ok?finalUrl:null,contact_email:email,
+     submission_method:email?"email":(ev.ok?( /mailto:/i.test(html)?"email":"form"):"unknown"),
+     accepts_free_submissions:false,
+     activity_status:"unknown",source_name:"Public Web Search (Bing RSS / Google News RSS / DuckDuckGo)",
+     source_url:url,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending"};
     await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(candidate)});
     queued++;
    }
