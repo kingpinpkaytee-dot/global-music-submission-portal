@@ -110,7 +110,7 @@ async function search(q){
  }
  // Round-robin providers so the first engine cannot crowd out the others.
  const unique=[],seen=new Set();
- for(let index=0;index<12;index++){
+ for(let index=0;index<20;index++){
   for(const bucket of buckets){
    const hit=bucket[index];if(!hit)continue;
    try{
