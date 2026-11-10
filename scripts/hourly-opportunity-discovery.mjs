@@ -178,7 +178,7 @@ async function main(){
     categorySeen.add(categoryKey);
     processedByCategory[item.category]=(processedByCategory[item.category]||0)+1;
     if(processedByCategory[item.category]>12)continue;
-    seen++;const url=hit.link;
+    seen++;let url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
     // Follow Google News RSS redirects once; retain only real publisher destinations.
     let urlHost="";
