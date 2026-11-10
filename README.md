@@ -20,7 +20,7 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 ## Production status — 9 November 2026
 
-The Supabase production project is linked and migrations **0001–0015** are applied. Migration **0016** is committed but still requires production application and verification.
+The Supabase production project is linked. Migrations **0001–0015** were previously confirmed applied; later discovery, payment and opportunity batches **0016–0024** are committed in the repository and must be checked against the production migration history before applying any missing migrations, in numeric order.
 
 - **11/11 public tables have RLS enabled.**
 - **21 RLS policies** are installed.
@@ -47,7 +47,7 @@ Connected frontend flows include:
 - Artist profile read/update, including artist name, country, biography, genres, website/social links, Spotify Artist URL and press-kit URL.
 - Live public platform statistics and verified directory listings.
 - Credit balance from the ledger-backed balance view.
-- Credit-charged playlist, radio and website submissions through the protected `submit_artist_opportunity` RPC.
+- Credit-charged playlist, radio, website, curator, platform and contact submissions through the protected `submit_artist_opportunity` RPC, subject to a deployed delivery adapter and explicit destination acceptance.
 - Artist campaign creation and retrieval.
 - Marketplace release sharing, public published-track/weekly Top 5 display, and a restricted admin Marketplace approval/decline queue.
 - Protected admin directory create/update, verification-evidence recording, listing publication and deactivation. Integration/acceptance flags are not user-editable and remain locked until a delivery adapter is deployed.
@@ -76,7 +76,10 @@ The frontend has passed JavaScript ES-module syntax checks and a static DOM-bind
 - `supabase/migrations/0013_restrict_updated_at_trigger_execution.sql` — removes direct browser-role execution of the updated-at trigger helper.
 - `supabase/migrations/0014_artist_profile_genres_and_press_kit.sql` — structured artist genre and press-kit fields.
 - `supabase/migrations/0015_secure_opportunity_directory_acceptance.sql` — integration and acceptance gates, admin directory RPC and credit-spend eligibility checks.
-- `supabase/migrations/0016_expand_submission_destinations.sql` — adds curator, promotion-platform and industry-contact submission categories while retaining trusted delivery-integration and acceptance gates.
+- `supabase/migrations/0016_opportunity_discovery_intelligence.sql` — private discovery runs and reviewable candidates.
+- `supabase/migrations/0022_hourly_opportunity_discovery.sql` — hourly discovery audit trail.
+- `supabase/migrations/0023_expand_submission_destinations.sql` — curator, promotion-platform and industry-contact categories, plus protected submission eligibility checks.
+- `supabase/migrations/0024_google_search_submission_candidates.sql` — Google Search research candidates for admin review; no automatic public publication.
 - `src/supabase-client.js` — one shared Supabase client and safe public-key configuration check.
 - `src/auth.js` — email/password, Google OAuth, session handling and sign-out.
 - `src/app.js` — live public data, artist dashboard, submissions, campaigns, Marketplace and admin moderation integration.
@@ -110,3 +113,10 @@ See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md`, `
 
 **Artist Frequency**  
 *Music. Passion. Legacy.*
+
+
+## Google Search discovery and delivery boundaries
+
+The website's Google Programmable Search Element remains a user-facing search box. The hourly worker uses Google's Custom Search JSON API only if the Google Cloud project is entitled to that legacy API. Google closed Custom Search JSON API access to new customers on 20 January 2026 and has announced retirement on 1 January 2027. An API key and Search Engine ID alone do not prove entitlement. If the worker receives 403 access-denied responses, the project must use an eligible Google-supported alternative; do not scrape Google result pages or claim automated search is running.
+
+The discovery worker now queues candidates for admin review only. It does not insert or update public directory records, does not set verified/public flags, and never enables in-platform submissions. Migration 0024 stages 24 source-backed research candidates found through Google Search; they remain pending until a human checks their current submission route, terms, recipient and genre fit. Contact emails and external forms are displayed as information only until a real, tested delivery adapter is configured.
