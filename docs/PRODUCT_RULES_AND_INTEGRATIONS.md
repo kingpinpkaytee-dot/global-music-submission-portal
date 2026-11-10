@@ -101,3 +101,10 @@ The browser frontend connects to the deployed backend for email/password authent
 - Integrate Spotify API access only when approved and available.
 - Add rate limits, abuse controls, account deletion, retention procedures and audit review.
 - Publish privacy, Terms, content-rights and moderation policies before public launch.
+
+
+## Expanded submission destinations — migration 0016
+
+Migration 0016 extends directory and artist submission types to include playlist curators, promotion platforms and industry contacts alongside playlists, radio stations and websites. The administrator directory manager can maintain contact records, including a verified public contact email or official submission URL. The artist submission selector maps each new destination type to its matching directory category.
+
+These are submission channels in the portal, not a claim that messages have already been delivered externally. The protected submission RPC still requires a destination to be verified, public, active, integrated and explicitly accepting submissions before it creates a credit-charged submission. Migration 0016 leaves all integration and acceptance flags false. A real delivery adapter (for example, a contracted email/API integration or an authorised recipient-side submission endpoint) must be deployed and tested before any destination can be enabled. Until then, artists can inspect official contact details and external submission links; no credit is charged for opening them.
