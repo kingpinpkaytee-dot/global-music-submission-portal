@@ -247,12 +247,9 @@ async function main(){
     }[item.category]===true;
     if(!categoryRelevant){
      rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",spotifyDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
-     await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
-      method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
-      body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
-       submission_url:null,evidence:(hit.title+" — "+(hit.snippet||"")).slice(0,1800),
-       verification_status:"rejected",verification_reason:"Search result did not contain enough category-specific relevance; excluded from admin queue"})
-     });
+     // Rejected search noise is recorded in the run diagnostics, not inserted
+     // into the admin candidate table. This keeps the review queue clean and
+     // avoids treating unqualified search results as candidate records.
      rejected++;continue;
     }
     await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
