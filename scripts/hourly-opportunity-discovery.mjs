@@ -22,7 +22,7 @@ const playlistRegions=[
 ];
 const playlistGenres=["Amapiano","Afro House","Deep House","Afrobeats","Melodic House","Organic House"];
 const playlistQueries=playlistRegions.slice(0,18).map((region,index)=>({
- category:"playlist",
+ category:"playlist",region,
  q:`"${playlistGenres[index%playlistGenres.length]}" Spotify playlist curator "${region}" "submit music" OR "submit your track" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:spotify.com -site:submittable.com -jobs -definition`
 }));
 const platformPlaylistQueries=[
