@@ -1,102 +1,102 @@
-// Hourly Google Custom Search discovery for Artist Frequency.
-// Only promote records with a reachable official submission route and category-specific evidence.
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GOOGLE_API_KEY = process.env.GOOGLE_CSE_API_KEY;
-const GOOGLE_CX = process.env.GOOGLE_CSE_ID;
-if (![SUPABASE_URL,SERVICE_ROLE_KEY,GOOGLE_API_KEY,GOOGLE_CX].every(Boolean)) {
-  throw new Error("Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GOOGLE_CSE_API_KEY or GOOGLE_CSE_ID.");
-}
-const headers = { apikey:SERVICE_ROLE_KEY, Authorization:`Bearer ${SERVICE_ROLE_KEY}`, "Content-Type":"application/json" };
-const queries = [
-  {category:"playlist",q:'site:playlistdock.com/playlist.php ("submit track" OR "submit music") Spotify playlist'},
-  {category:"radio_station",q:'radio station "submit music" OR "music submissions" independent artists'},
-  {category:"blogger",q:'music blog "submit music" OR "submit your music" independent artists'},
-  {category:"curator",q:'Spotify playlist curator "submit music" OR "submit track" open submissions'}
+// Google Programmable Search discovery for Artist Frequency.
+// Candidates are queued for administrator review. This worker never publishes
+// directory entries or enables submissions.
+const SUPABASE_URL=process.env.SUPABASE_URL;
+const SERVICE_ROLE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GOOGLE_API_KEY=process.env.GOOGLE_CSE_API_KEY;
+const GOOGLE_CX=process.env.GOOGLE_CSE_ID;
+if(![SUPABASE_URL,SERVICE_ROLE_KEY,GOOGLE_API_KEY,GOOGLE_CX].every(Boolean)) throw new Error("Missing required Supabase or Google CSE configuration.");
+const headers={apikey:SERVICE_ROLE_KEY,Authorization:"Bearer "+SERVICE_ROLE_KEY,"Content-Type":"application/json"};
+const queries=[
+ {category:"playlist",q:'Spotify playlist "submit your track" OR "submit music" free curator'},
+ {category:"radio_station",q:'radio station "music submissions" OR "submit your music" independent artists'},
+ {category:"blogger",q:'music blog OR music magazine "submit music" OR "send us music"'},
+ {category:"curator",q:'Spotify playlist curator "submit track" OR "music submission" open'}
 ];
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
-async function rest(path, options={}) {
-  const r=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{...options,headers:{...headers,...options.headers}});
-  const body=await r.text();
-  if(!r.ok) throw new Error(`Supabase ${r.status}: ${body.slice(0,500)}`);
-  return body ? JSON.parse(body) : null;
+const now=()=>new Date().toISOString();
+async function request(url,options={},label="request"){
+ const res=await fetch(url,{...options,signal:AbortSignal.timeout(15000)});
+ const body=await res.text();
+ if(!res.ok) throw new Error(label+" "+res.status+": "+body.slice(0,400));
+ return body?JSON.parse(body):null;
 }
-async function search(q) {
-  const u=new URL("https://www.googleapis.com/customsearch/v1");
-  u.searchParams.set("key",GOOGLE_API_KEY);u.searchParams.set("cx",GOOGLE_CX);
-  u.searchParams.set("q",q);u.searchParams.set("num","10");
-  const r=await fetch(u);if(!r.ok) throw new Error(`Google CSE ${r.status}: ${(await r.text()).slice(0,250)}`);
-  const j=await r.json();return j.items||[];
+async function rest(path,options={}){
+ return request(SUPABASE_URL+"/rest/v1/"+path,{...options,headers:{...headers,...options.headers}},"Supabase");
 }
-async function inspect(url) {
-  try {
-    const r=await fetch(url,{redirect:"follow",signal:AbortSignal.timeout(12000),headers:{"User-Agent":"ArtistFrequencyOpportunityVerifier/1.0"}});
-    if(!r.ok) return {ok:false,reason:`HTTP ${r.status}`};
-    const type=r.headers.get("content-type")||"";
-    const text=type.includes("text") ? (await r.text()).slice(0,350000) : "";
-    if(type.includes("text/html") && /captcha|cloudflare challenge|access denied/i.test(text.slice(0,12000)))
-      return {ok:false,reason:"Blocked by challenge; manual verification required"};
-    return {ok:true,finalUrl:r.url,html:text};
-  } catch(e) { return {ok:false,reason:String(e.message||e)}; }
+async function search(q){
+ const u=new URL("https://www.googleapis.com/customsearch/v1");
+ u.searchParams.set("key",GOOGLE_API_KEY);u.searchParams.set("cx",GOOGLE_CX);u.searchParams.set("q",q);u.searchParams.set("num","10");
+ const data=await request(u,{},"Google Custom Search");return data.items||[];
+}
+async function inspect(url){
+ try{
+  const res=await fetch(url,{redirect:"follow",signal:AbortSignal.timeout(12000),headers:{"User-Agent":"ArtistFrequencyOpportunityResearch/1.1"}});
+  if(!res.ok)return {ok:false,reason:"HTTP "+res.status};
+  const type=res.headers.get("content-type")||"";
+  const html=type.includes("text")?(await res.text()).slice(0,250000):"";
+  if(/captcha|cloudflare challenge|access denied/i.test(html.slice(0,12000)))return {ok:false,reason:"Blocked by challenge; manual review required"};
+  return {ok:true,finalUrl:res.url,html};
+ }catch(e){return {ok:false,reason:String(e.message||e)};}
 }
 function cleanName(s){return String(s||"").replace(/\s+/g," ").replace(/[|<>]/g,"").trim().slice(0,160);}
-function categoryEvidence(category,title,snippet,html,url){
-  const all=(title+" "+snippet+" "+html.slice(0,80000)).toLowerCase();
-  const submit=/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here)/i.test(all);
-  if(!submit) return {ok:false,reason:"No explicit music-submission evidence found"};
-  const route=/<form\b|mailto:|href\s*=\s*["'][^"']*(submit|submission|demo|upload)[^"']*["']/i.test(html) || /\/(submit|submission|demo|music-upload)/i.test(url);
-  if(!route) return {ok:false,reason:"No direct submission form or route found"};
-  if(category==="playlist"){
-    const spotify=html.match(/https?:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/i) || html.match(/https?:\\\/\\\/open\.spotify\.com\\\/playlist\\\/([A-Za-z0-9]+)/i);
-    if(!spotify) return {ok:false,reason:"No individual Spotify playlist URL found on source page"};
-    return {ok:true,spotifyUrl:spotify[0].replace(/\\/g,"")};
-  }
-  if(category==="radio_station" && !/(radio|broadcast|fm|station)/i.test(all)) return {ok:false,reason:"No radio-station identity evidence"};
-  if(category==="blogger" && !/(blog|magazine|editorial|music review|press)/i.test(all)) return {ok:false,reason:"No music editorial identity evidence"};
-  if(category==="curator" && !/(playlist|curator|spotify)/i.test(all)) return {ok:false,reason:"No playlist-curator identity evidence"};
-  return {ok:true};
+function extractEmail(html){
+ const found=[...String(html||"").matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig)].map(x=>x[0].toLowerCase());
+ return found.find(e=>/(music|submit|demo|artist|press|radio|playlist)/i.test(e))||null;
+}
+function evidence(category,title,snippet,html,url){
+ const all=(title+" "+snippet+" "+html.slice(0,100000)).toLowerCase();
+ if(!/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here)/i.test(all))return {ok:false,reason:"No explicit music-submission evidence"};
+ const route=/<form\b|mailto:|href\s*=\s*["'][^"']*(submit|submission|demo|upload|pitch)[^"']*["']/i.test(html)||/\/(submit|submission|demo|music-upload|pitch)/i.test(url);
+ if(!route)return {ok:false,reason:"No identifiable submission route"};
+ if(category==="playlist"){
+  const spotify=html.match(/https?:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/i);
+  if(!spotify)return {ok:false,reason:"No individual Spotify playlist URL; manual review required"};
+  return {ok:true,spotifyUrl:spotify[0]};
+ }
+ if(category==="radio_station"&&!/(radio|broadcast|fm|station)/i.test(all))return {ok:false,reason:"No radio-station identity"};
+ if(category==="blogger"&&!/(blog|magazine|editorial|music review|press)/i.test(all))return {ok:false,reason:"No music-editorial identity"};
+ if(category==="curator"&&!/(playlist|curator|spotify)/i.test(all))return {ok:false,reason:"No playlist-curator identity"};
+ return {ok:true};
 }
 async function main(){
-  const run=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
-  const runId=run[0].id;let seen=0,added=0,updated=0,rejected=0,done=0;const errors=[];
-  for(const item of queries){
-    try{
-      const results=await search(item.q);done++;
-      for(const hit of results){
-        seen++;const url=hit.link;if(!url||!/^https?:\/\//i.test(url)) {rejected++;continue;}
-        const checked=await inspect(url);
-        let ev={ok:false,reason:checked.reason||"Unreachable"};
-        if(checked.ok) ev=categoryEvidence(item.category,hit.title||"",hit.snippet||"",checked.html||"",checked.finalUrl||url);
-        const name=cleanName(hit.title);if(!name){rejected++;continue;}
-        const candidate={run_id:runId,category:item.category,name,destination_url:checked.finalUrl||url,
-          submission_url:checked.ok?checked.finalUrl:null,evidence:(hit.snippet||"").slice(0,1800),
-          verification_status:ev.ok?"verified":"rejected",verification_reason:ev.ok?"Reachable official source and submission evidence":ev.reason};
-        await rest("hourly_opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},body:JSON.stringify(candidate)});
-        if(!ev.ok){rejected++;continue;}
-        const record={category:item.category,name,website_url:checked.finalUrl||url,
-          submission_url:checked.finalUrl||url,genres:[],is_verified:true,is_active:true,is_public:true,
-          verification_evidence_url:checked.finalUrl||url,verified_at:new Date().toISOString(),
-          source_name:"Google Custom Search",source_url:url,submission_method:"form",
-          accepts_free_submissions:/free (submission|to submit|music submissions)|no fee/i.test(checked.html||""),activity_status:"active",first_seen_at:new Date().toISOString(),
-          last_checked_at:new Date().toISOString(),source_evidence_url:url,data_confidence:"source_confirmed",
-          is_integrated:false,accepts_submissions:false};
-        if(item.category==="playlist") {
-          record.website_url=ev.spotifyUrl;record.dsp_name="Spotify";
-          record.submission_url=checked.finalUrl||url;record.accepts_free_submissions=/free submission|free to submit|no fee/i.test(checked.html||"");
-        }
-        const existing=await rest(`opportunity_directories?select=id&category=eq.${encodeURIComponent(item.category)}&name=eq.${encodeURIComponent(name)}&limit=1`);
-        if(existing?.length){
-          await rest(`opportunity_directories?id=eq.${existing[0].id}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({last_checked_at:record.last_checked_at,is_active:true,is_verified:true,verification_evidence_url:record.verification_evidence_url})});updated++;
-        }else{
-          await rest("opportunity_directories",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(record)});added++;
-        }
-      }
-    }catch(e){errors.push(`${item.category}: ${e.message}`);}
-    await sleep(350);
-  }
-  const status=errors.length?(done?"partial":"failed"):"completed";
-  await rest(`hourly_opportunity_discovery_runs?id=eq.${runId}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({finished_at:new Date().toISOString(),status,searches_run:done,candidates_seen:seen,records_added:added,records_updated:updated,records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
-  console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,recordsAdded:added,recordsUpdated:updated,recordsRejected:rejected,errors},null,2));
-  if(!done) process.exitCode=1;
+ const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,done=0;const errors=[];
+ for(const item of queries){
+  try{
+   const hits=await search(item.q);done++;
+   for(const hit of hits){
+    seen++;const url=hit.link;
+    if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
+    const page=await inspect(url);
+    const ev=page.ok?evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url):{ok:false,reason:page.reason||"Unreachable"};
+    const name=cleanName(hit.title);if(!name){rejected++;continue;}
+    const finalUrl=page.finalUrl||url;
+    await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
+     method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
+     body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
+      submission_url:page.ok?finalUrl:null,evidence:(hit.snippet||"").slice(0,1800),
+      verification_status:"pending",verification_reason:ev.ok?"Automatic checks passed; admin review required":ev.reason})
+    });
+    if(!ev.ok){rejected++;continue;}
+    const existing=await rest("opportunity_discovery_candidates?select=id&category=eq."+encodeURIComponent(item.category)+"&source_url=eq."+encodeURIComponent(url)+"&limit=1");
+    if(existing&&existing.length)continue;
+    const html=page.html||"",email=extractEmail(html);
+    const candidate={category:item.category,name,country:null,dsp_name:item.category==="playlist"?"Spotify":null,
+     genres:[],website_url:ev.spotifyUrl||finalUrl,submission_url:finalUrl,contact_email:email,
+     submission_method:email||/mailto:/i.test(html)?"email":"form",
+     accepts_free_submissions:/free (submission|to submit|music submissions)|no fee|always free/i.test(html+" "+(hit.snippet||"")),
+     activity_status:"active",source_name:"Google Programmable Search Engine",source_url:url,
+     evidence_url:finalUrl,first_seen_at:now(),last_checked_at:now(),review_status:"pending"};
+    await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(candidate)});
+    queued++;
+   }
+  }catch(e){errors.push(item.category+": "+e.message);}
+ }
+ const status=errors.length?(done?"partial":"failed"):"completed";
+ await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
+  finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:0,records_updated:0,
+  records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
+ console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,errors},null,2));
+ if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
