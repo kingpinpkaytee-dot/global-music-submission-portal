@@ -1,4 +1,4 @@
--- Controlled autonomous publication for independently inspected music-submission pages.
+-- Controlled autonomous publication for publisher pages corroborated by a second, independent source.
 -- The worker must provide fresh, structured evidence. This does NOT enable in-platform
 -- submissions or mark listings as integrated.
 BEGIN;
@@ -45,6 +45,13 @@ BEGIN
      OR evidence->>'submission_route_found' IS DISTINCT FROM 'true'
      OR evidence->>'category_match' IS DISTINCT FROM 'true'
      OR evidence->>'canonical_destination' IS DISTINCT FROM 'true'
+     OR evidence->>'independent_corroboration' IS DISTINCT FROM 'true'
+     OR evidence->>'independent_source_reachable' IS DISTINCT FROM 'true'
+     OR evidence->>'independent_identity_match' IS DISTINCT FROM 'true'
+     OR coalesce(evidence->>'independent_source_url','') !~* '^https?://'
+     OR lower(evidence->>'independent_source_url') LIKE '%news.google.com%'
+     OR split_part(regexp_replace(lower(evidence->>'independent_source_url'), '^https?://', ''), '/', 1)
+        = split_part(regexp_replace(lower(coalesce(candidate.source_url,'')), '^https?://', ''), '/', 1)
      OR candidate.auto_verified_at IS NULL
      OR candidate.auto_verified_at < now() - interval '24 hours'
      OR candidate.source_url IS NULL
