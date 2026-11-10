@@ -52,8 +52,8 @@ async function fetchFeed(url,label){
  if(!res.ok)throw new Error(label+" HTTP "+res.status+": "+body.slice(0,160).replace(/\s+/g," "));
  const items=rssItems(body);
  if(items.length)return items;
- const validFeed=/<(?:rss|feed)\\b/i.test(body);
- const hasEntries=/<(?:item|entry)\\b/i.test(body);
+ const validFeed=/<(?:rss|feed)\b/i.test(body);
+ const hasEntries=/<(?:item|entry)\b/i.test(body);
  const reason=validFeed&&!hasEntries?"valid RSS/Atom feed contained zero entries":"response contained entries or content that the parser could not extract";
  throw new Error(label+" "+reason+" (type="+(res.headers.get("content-type")||"unknown")+", bytes="+body.length+", preview="+body.slice(0,100).replace(/\s+/g," ")+")");
 }
