@@ -1,4 +1,4 @@
-// Public web-search discovery for Artist Frequency (Bing RSS, DuckDuckGo HTML fallback).
+// Public web-search discovery for Artist Frequency (Bing RSS + Google News RSS).
 // Candidates are queued for administrator review. This worker never publishes
 // directory entries or enables submissions.
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -12,14 +12,14 @@ if(!isNewSecretKey&&SERVICE_ROLE_KEY.split(".").length!==3) throw new Error("SUP
 const headers={apikey:SERVICE_ROLE_KEY,...(isNewSecretKey?{}:{Authorization:"Bearer "+SERVICE_ROLE_KEY}),"Content-Type":"application/json"};
 // Exact-phrase searches avoid dictionary matches on the word "submit".
 const queries=[
- {category:"playlist",q:'"submit your Spotify playlist" curator -definition -dictionary -lyrics'},
- {category:"playlist",q:'"Spotify playlist submission" "submit music" curator -definition -lyrics'},
- {category:"radio_station",q:'"radio music submissions" station artists -jobs -definition'},
- {category:"radio_station",q:'"submit music to" "radio station" artist submission form -definition'},
- {category:"blogger",q:'"submit music" "music blog" independent artists -definition -lyrics'},
- {category:"blogger",q:'"send us your music" blog editorial submissions -jobs'},
- {category:"curator",q:'"playlist curator" "submit your track" Spotify -definition -lyrics'},
- {category:"curator",q:'"submit music to our playlist" Spotify curator -definition'}
+ {category:"playlist",q:'"submit playlist" Spotify curator inurl:submit -dictionary -definition -lyrics -jobs -tips'},
+ {category:"playlist",q:'"Spotify playlist submission" curator "submit track" -dictionary -definition -jobs -guide'},
+ {category:"radio_station",q:'"music submissions" radio station artist "submit" -jobs -definition -directory'},
+ {category:"radio_station",q:'"submit music" "radio station" "music director" form -jobs -definition'},
+ {category:"blogger",q:'"submit your music" "music blog" submissions -jobs -definition -howto'},
+ {category:"blogger",q:'"music submissions" blog editorial contact "send music" -jobs -definition'},
+ {category:"curator",q:'"playlist curator" "submit your track" Spotify submission form -definition -lyrics'},
+ {category:"curator",q:'"submit music to our playlist" Spotify curator form -definition -guide'}
 ];
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
@@ -71,33 +71,10 @@ async function search(q){
   }},
   {name:"Google News RSS",run:async()=>{
    const u=new URL("https://news.google.com/rss/search");
-   u.searchParams.set("q",q);u.searchParams.set("hl","en-ZA");u.searchParams.set("gl","ZA");u.searchParams.set("ceid","ZA:en");
+   u.searchParams.set("q",q);u.searchParams.set("hl","en-US");u.searchParams.set("gl","US");u.searchParams.set("ceid","US:en");
    return fetchFeed(u,"Google News RSS");
   }},
-  {name:"DuckDuckGo Lite",run:async()=>{
-   const u=new URL("https://lite.duckduckgo.com/lite/");u.searchParams.set("q",q);
-   const res=await fetch(u,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
-   const html=await res.text();
-   if(!res.ok)throw new Error("DuckDuckGo Lite HTTP "+res.status+": "+html.slice(0,220).replace(/\s+/g," "));
-   if(/anomaly-modal|bots use duckduckgo|select all squares|unusual traffic|captcha/i.test(html.slice(0,30000)))
-    throw new Error("DuckDuckGo Lite anti-bot/challenge response (bytes="+html.length+")");
-   // Lite markup varies: parse outbound anchors rather than relying on one CSS class.
-   const anchors=[...html.matchAll(/<a\b([^>]*?)>([\s\S]*?)<\/a>/gi)];
-   const items=anchors.map(m=>{
-    const href=m[1].match(/href=["']([^"']+)["']/i);let link=href?decodeHtml(href[1]):"";
-    try{
-     const p=new URL(link);
-     if(p.hostname.includes("duckduckgo.com"))for(const key of ["uddg","url","u"])if(p.searchParams.has(key)){link=decodeHtml(p.searchParams.get(key));break;}
-    }catch{}
-    const title=stripTags(m[2]);
-    return {title,link,snippet:""};
-   }).filter(x=>{
-    try{const u=new URL(x.link);return /^https?:$/.test(u.protocol)&&!/(^|\.)duckduckgo\.com$/i.test(u.hostname)&&x.title.length>2&&!/^(next|previous|more|settings|images|videos|maps)$/i.test(x.title);}
-    catch{return false;}
-   });
-   if(!items.length)throw new Error("DuckDuckGo Lite returned no usable outbound anchors (bytes="+html.length+", preview="+html.slice(0,220).replace(/\s+/g," ")+")");
-   return items;
-  }}
+
  ];
  const results=await Promise.allSettled(providers.map(async p=>({provider:p.name,items:await p.run()})));
  const buckets=[],stats={};
