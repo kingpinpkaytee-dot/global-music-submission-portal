@@ -27,12 +27,12 @@ const playlistQueries=playlistRegions.slice(0,18).map(region=>({
  q:`("music playlist" OR "Spotify playlist" OR "Apple Music playlist" OR "YouTube playlist") ("followers" OR "response rate") "${region}" active curator -jobs -definition`
 }));
 const platformPlaylistQueries=[
- {category:"playlist",dsp:"Spotify",q:'site:open.spotify.com/playlist playlist followers curator active'},
- {category:"playlist",dsp:"YouTube",q:'site:youtube.com/playlist music playlist followers active curator'},
- {category:"playlist",dsp:"YouTube Music",q:'site:music.youtube.com/playlist playlist followers curator'},
- {category:"playlist",dsp:"Apple Music",q:'site:music.apple.com playlist followers curator'},
- {category:"playlist",dsp:"Deezer",q:'site:deezer.com playlist followers curator'},
- {category:"playlist",dsp:"Tidal",q:'site:tidal.com/browse/playlist playlist followers curator'},
+ {category:"playlist",dsp:"Spotify",q:'site:open.spotify.com/playlist "playlist curator" ("submit music" OR "submission")'},
+ {category:"playlist",dsp:"YouTube",q:'site:youtube.com/playlist ("music curator" OR "submit music" OR "playlist submission")'},
+ {category:"playlist",dsp:"YouTube Music",q:'site:music.youtube.com/playlist ("curator" OR "submit music" OR "playlist submission")'},
+ {category:"playlist",dsp:"Apple Music",q:'site:music.apple.com "playlist" ("submit music" OR "curator" OR "music submission")'},
+ {category:"playlist",dsp:"Deezer",q:'site:deezer.com/playlist ("curator" OR "submit music" OR "playlist submission")'},
+ {category:"playlist",dsp:"Tidal",q:'site:tidal.com/browse/playlist ("curator" OR "submit music" OR "playlist submission")'},
  {category:"playlist",dsp:"SubmitHub",q:'site:submithub.com curator playlist "response rate" followers active'},
  {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com playlist curator followers active response'},
  {category:"playlist",dsp:"Daily Playlists",q:'site:dailyplaylists.com playlist curator followers active response rate'},
@@ -52,7 +52,15 @@ const platformPlaylistQueries=[
  {category:"playlist",dsp:"Playlist curator profiles",q:'"response rate" "Spotify playlist" curator "followers"'},
  {category:"playlist",dsp:"Playlist curator profiles",q:'"responds to" "playlist submissions" Spotify curator'},
  {category:"playlist",dsp:"Playlist curator profiles",q:'"last active" playlist curator music submission followers'},
- {category:"playlist",dsp:"Playlist curator profiles",q:'"active curator" "response rate" music playlist submit'}
+ {category:"playlist",dsp:"Playlist curator profiles",q:'"active curator" "response rate" music playlist submit'},
+ {category:"playlist",dsp:"SubmitLink curator profiles",q:'site:submitlink.io/c/ "Spotify" "followers" ("response rate" OR "responds to")'},
+ {category:"playlist",dsp:"SubmitLink curator profiles",q:'site:submitlink.io/c/ "followers" "active" playlist'},
+ {category:"playlist",dsp:"SubmitLink curator profiles",q:'site:submitlink.io/c/ "open.spotify.com/playlist" curator'},
+ {category:"playlist",dsp:"SubmitHub curator profiles",q:'site:submithub.com/curators "response rate" "followers" Spotify'},
+ {category:"playlist",dsp:"SubmitHub curator profiles",q:'site:submithub.com "responds to" "playlist" "Spotify" curator'},
+ {category:"playlist",dsp:"Groover curator profiles",q:'site:groover.co "response rate" "followers" playlist curator'},
+ {category:"playlist",dsp:"Daily Playlists curator profiles",q:'site:dailyplaylists.com "Spotify playlist" "curator" "followers"'},
+ {category:"playlist",dsp:"Pitchplaylists curator profiles",q:'site:pitchplaylists.com "Spotify playlist" "followers" curator'}
 ];
 const queries=[...playlistQueries,...platformPlaylistQueries];
 const now=()=>new Date().toISOString();
@@ -381,7 +389,7 @@ async function main(){
     const lowerText=(name+" "+(hit.snippet||"")+" "+html.slice(0,50000)).toLowerCase();
     const knownGenres=["Amapiano","Afro House","Afrobeats","Afrobeat","Deep House","Melodic House","Organic House","Hip Hop","Rap","R&B","Soul","Funk","Jazz","Blues","Rock","Alternative","Indie","Pop","Dance","EDM","House","Tech House","Progressive House","Techno","Trance","Drum and Bass","Dubstep","Garage","Disco","Reggae","Dancehall","Gospel","Christian","Classical","Country","Folk","Metal","Punk","Latin","Reggaeton","K-Pop","J-Pop","Ambient","Downtempo","Chillout","World Music"];
     const extractedGenres=knownGenres.filter(g=>lowerText.includes(g.toLowerCase()));
-    const metrics=extractPlaylistMetrics(lowerText+" "+(hit.snippet||""));
+    const metrics=extractPlaylistMetrics(html+" "+(hit.snippet||"")+" "+name);
     const followerCount=metrics.followerCount;
     const responseRate=metrics.responseRate;
     const activityStatus=metrics.activityStatus;
