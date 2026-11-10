@@ -29,7 +29,7 @@ RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   current_artist uuid := auth.uid();
   current_role text;
