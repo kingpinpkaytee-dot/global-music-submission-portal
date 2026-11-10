@@ -20,43 +20,28 @@ const playlistRegions=[
  "India","Japan","South Korea","Australia","New Zealand",
  "Jamaica","Trinidad and Tobago","France","Portugal","Poland"
 ];
-const playlistGenres=["Amapiano","Afro House","Deep House","Afrobeats","Melodic House","Organic House"];
-const playlistQueries=playlistRegions.slice(0,18).map((region,index)=>({
+// Playlist-only discovery: all genres, worldwide, across major DSPs and curator platforms.
+// Qualification: strictly more than 100 followers, explicitly active, response rate 0.5%-100%.
+const playlistQueries=playlistRegions.slice(0,18).map(region=>({
  category:"playlist",region,
- q:`"${playlistGenres[index%playlistGenres.length]}" Spotify playlist curator "${region}" "submit music" OR "submit your track" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:spotify.com -site:submittable.com -jobs -definition`
+ q:`("music playlist" OR "Spotify playlist" OR "Apple Music playlist" OR "YouTube playlist") ("followers" OR "response rate") "${region}" active curator -jobs -definition`
 }));
 const platformPlaylistQueries=[
- {category:"playlist",dsp:"Spotify",q:'site:open.spotify.com/playlist Amapiano OR "Afro House" OR "Deep House" playlist'},
- {category:"playlist",dsp:"YouTube",q:'site:youtube.com/playlist Amapiano OR "Afro House" OR "Deep House" playlist'},
- {category:"playlist",dsp:"YouTube Music",q:'site:music.youtube.com/playlist Amapiano OR "Afro House" OR "Deep House"'},
- {category:"playlist",dsp:"Apple Music",q:'site:music.apple.com playlist Amapiano OR "Afro House" OR "Deep House"'},
- {category:"playlist",dsp:"Deezer",q:'site:deezer.com playlist Amapiano OR "Afro House" OR "Deep House"'},
- {category:"playlist",dsp:"Tidal",q:'site:tidal.com/browse/playlist Amapiano OR "Afro House" OR "Deep House"'},
- {category:"playlist",dsp:"SubmitHub",q:'site:submithub.com playlist curator submit music Amapiano OR Afro House OR Deep House'},
- {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com playlist submission Amapiano OR Afro House OR Deep House'},
- {category:"playlist",dsp:"Daily Playlists",q:'site:dailyplaylists.com playlist submit music Amapiano OR Afro House OR Deep House'}
+ {category:"playlist",dsp:"Spotify",q:'site:open.spotify.com/playlist playlist followers curator active'},
+ {category:"playlist",dsp:"YouTube",q:'site:youtube.com/playlist music playlist followers active curator'},
+ {category:"playlist",dsp:"YouTube Music",q:'site:music.youtube.com/playlist playlist followers curator'},
+ {category:"playlist",dsp:"Apple Music",q:'site:music.apple.com playlist followers curator'},
+ {category:"playlist",dsp:"Deezer",q:'site:deezer.com playlist followers curator'},
+ {category:"playlist",dsp:"Tidal",q:'site:tidal.com/browse/playlist playlist followers curator'},
+ {category:"playlist",dsp:"SubmitHub",q:'site:submithub.com curator playlist "response rate" followers active'},
+ {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com playlist curator followers active response'},
+ {category:"playlist",dsp:"Daily Playlists",q:'site:dailyplaylists.com playlist curator followers active response rate'},
+ {category:"playlist",dsp:"Groover",q:'site:groover.co playlist curator "response rate" active followers'},
+ {category:"playlist",dsp:"SubmitLink",q:'site:submitlink.io playlist curator followers response rate active'},
+ {category:"playlist",dsp:"PlaylistSupply",q:'playlist curator database "response rate" followers active'},
+ {category:"playlist",dsp:"Global playlist curators",q:'music playlist curator "response rate" "followers" active submission'}
 ];
-const portalQueries=[
- {category:"platform",q:'music submission portal independent artists playlist curator submit music official'},
- {category:"platform",q:'music promotion platform playlist submission radio blogger curator submit track official'},
- {category:"platform",q:'site:groover.co music curator playlist radio blog submit music'},
- {category:"platform",q:'site:indiemono.com music submit playlist curator'},
- {category:"platform",q:'site:submitlink.io playlist curator submit track music'},
- {category:"platform",q:'site:playlistdock.com playlist curator submit music'},
- {category:"platform",q:'site:audiartist.com music submission playlist radio curator'}
-];
-const queries=[
- ...playlistQueries,...platformPlaylistQueries,
- {category:"radio_station",q:'"music submissions" "radio station" "send music" official station submission form -jobs -directory'},
- {category:"radio_station",q:'"submit music" radio "music director" "submission form" official station'},
- {category:"radio_station",q:'radio station artist submissions music submission contact email FM official'},
- {category:"blogger",q:'"send us your music" "music blog" submissions official contact'},
- {category:"blogger",q:'"music blog" "submit music" "submission guidelines" independent artist'},
- {category:"blogger",q:'music magazine blog artist music submissions review submit track contact'},
- {category:"curator",q:'"playlist curator" "free submissions" Spotify "submit" official'},
- {category:"curator",q:'"Spotify playlist" "accepting submissions" curator submit track official'},
- ...portalQueries
-];
+const queries=[...playlistQueries,...platformPlaylistQueries];
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
  const res=await fetch(url,{...options,signal:AbortSignal.timeout(15000)});
@@ -181,6 +166,31 @@ function extractDspPlaylist(html,url,snippet){
  const links=[...haystack.matchAll(/https?:\/\/[^\s"'<>]+/gi)].map(m=>decodeHtml(m[0]));
  for(const link of links){const found=detectDspPlaylistUrl(link);if(found)return found;}
  return null;
+}
+function parseCount(raw){
+ const value=String(raw||"").replace(/,/g,"").replace(/\\s/gi,"").toLowerCase();
+ const n=parseFloat(value);
+ if(!Number.isFinite(n))return null;
+ return Math.round(n*(value.endsWith("k")?1000:value.endsWith("m")?1000000:value.endsWith("b")?1000000000:1));
+}
+function extractPlaylistMetrics(value){
+ const text=stripTags(String(value||"")).replace(/&nbsp;/gi," ");
+ const followerPatterns=[
+  /(?:followers|follower count|playlist followers)\\s*[:\\-]?\\s*([0-9][0-9,.]*\\s*[kmb]?)/i,
+  /([0-9][0-9,.]*\\s*[kmb]?)\\s+followers\\b/i
+ ];
+ let followerCount=null;
+ for(const re of followerPatterns){const m=text.match(re);if(m){followerCount=parseCount(m[1]);if(followerCount!==null)break;}}
+ const responsePatterns=[
+  /response\\s*rate\\s*[:\\-]?\\s*(100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)\\s*%/i,
+  /(100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)\\s*%\\s*(?:response\\s*rate)/i,
+  /responds?\\s+to\\s+(100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)\\s*%/i
+ ];
+ let responseRate=null;
+ for(const re of responsePatterns){const m=text.match(re);if(m){responseRate=Number(m[1]);if(Number.isFinite(responseRate))break;}}
+ const activeEvidence=/(?:status|curator status|playlist status|account status)\\s*[:\\-]?\\s*active\\b|\\bactive\\s+(?:curator|playlist|profile)\\b|\\blast active\\b|\\bcurrently active\\b/i.test(text);
+ const inactiveEvidence=/\\b(?:inactive|paused|closed|disabled|not active)\\b/i.test(text);
+ return {followerCount,responseRate,activityStatus:activeEvidence&&!inactiveEvidence?"active":"unknown",activeEvidence,inactiveEvidence};
 }
 function evidence(category,title,snippet,html,url){
  const page=String(html||"").slice(0,150000).toLowerCase();
@@ -350,23 +360,34 @@ async function main(){
      // avoids treating unqualified search results as candidate records.
      rejected++;continue;
     }
-    await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
-     method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
-     body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
-      submission_url:ev.ok?finalUrl:null,
-      evidence:("Title: "+name+playlistData+" | Genres: "+(extractedGenres.join(", ")||"not reliably extracted")+" | Followers: "+(followerCount??"not verified")+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Submission route: "+(ev.ok?"confirmed":ev.reason||"not confirmed")+" | Automatic check: "+(corroboration.ok?"independent source matched":"manual review required")).slice(0,1800),
-      verification_status:"pending",
-      verification_reason:ev.ok?(corroboration.ok?"Publisher evidence and independent corroboration passed; automatic publication is still gated by database policy":"Publisher evidence passed, but independent corroboration was not found; administrator review required"):ev.reason+"; retained for administrator review"})
-    });
-    const existing=await rest("opportunity_discovery_candidates?select=id,name,category,source_url,website_url,submission_url,review_status,activity_status&category=eq."+encodeURIComponent(item.category)+"&source_url=eq."+encodeURIComponent(finalUrl)+"&limit=1");
-    if(existing&&existing.length){duplicates++;duplicateDetails.push(existing[0]);continue;}
     const html=page.html||"",email=extractEmail(html);
     const lowerText=(name+" "+(hit.snippet||"")+" "+html.slice(0,50000)).toLowerCase();
-    const knownGenres=["Amapiano","Afro House","Afrobeats","Deep House","Melodic House","Organic House","Hip Hop","R&B","Techno","Pop","Dance","Gospel"];
+    const knownGenres=["Amapiano","Afro House","Afrobeats","Afrobeat","Deep House","Melodic House","Organic House","Hip Hop","Rap","R&B","Soul","Funk","Jazz","Blues","Rock","Alternative","Indie","Pop","Dance","EDM","House","Tech House","Progressive House","Techno","Trance","Drum and Bass","Dubstep","Garage","Disco","Reggae","Dancehall","Gospel","Christian","Classical","Country","Folk","Metal","Punk","Latin","Reggaeton","K-Pop","J-Pop","Ambient","Downtempo","Chillout","World Music"];
     const extractedGenres=knownGenres.filter(g=>lowerText.includes(g.toLowerCase()));
-    const followerMatch=lowerText.match(/([0-9][0-9,.]*\s*[kmb]?)\s*(?:followers|subscribers)/i);
-    const followerCount=followerMatch?(()=>{const raw=followerMatch[1].replace(/,/g,"").replace(/\s/gi,"").toLowerCase();const n=parseFloat(raw);return Number.isFinite(n)?Math.round(n*(raw.endsWith("k")?1000:raw.endsWith("m")?1000000:raw.endsWith("b")?1000000000:1)):null;})():null;
+    const metrics=extractPlaylistMetrics(lowerText+" "+(hit.snippet||""));
+    const followerCount=metrics.followerCount;
+    const responseRate=metrics.responseRate;
+    const activityStatus=metrics.activityStatus;
     const playlistData=ev.playlistUrl?(" | DSP playlist: "+ev.dspName+" "+ev.playlistUrl):"";
+    const failedCriteria=[];
+    if(!ev.playlistUrl)failedCriteria.push("no individual public DSP playlist URL");
+    if(followerCount===null||followerCount<=100)failedCriteria.push("follower count must be greater than 100");
+    if(activityStatus!=="active")failedCriteria.push("active status not explicitly confirmed");
+    if(responseRate===null||responseRate<0.5||responseRate>100)failedCriteria.push("response rate must be between 0.5% and 100%");
+    if(failedCriteria.length){
+     rejectedDetails.push({category:"playlist",name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:failedCriteria.join("; "),followerCount,responseRate,activityStatus,searchSnippet:(hit.snippet||"").slice(0,300)});
+     rejected++;continue;
+    }
+    const existing=await rest("opportunity_discovery_candidates?select=id,name,category,source_url,website_url,submission_url,review_status,activity_status,follower_count,response_rate&category=eq.playlist&source_url=eq."+encodeURIComponent(finalUrl)+"&limit=1");
+    if(existing&&existing.length){duplicates++;duplicateDetails.push(existing[0]);continue;}
+    await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
+     method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
+     body:JSON.stringify({run_id:runId,category:"playlist",name,destination_url:finalUrl,
+      submission_url:ev.ok?finalUrl:null,
+      evidence:("Title: "+name+playlistData+" | Followers: "+followerCount+" | Response rate: "+responseRate+"% | Activity: "+activityStatus+" | Genres: "+(extractedGenres.join(", ")||"not reliably extracted")+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Submission route: "+(ev.ok?"confirmed":ev.reason||"not confirmed")+" | Independent check: "+(corroboration.ok?"matched":"manual review required")).slice(0,1800),
+      verification_status:"pending",
+      verification_reason:"Playlist metrics meet configured thresholds; administrator review required"})
+    });
     const candidate={category:item.category,name,country:item.region||null,dsp_name:ev.dspName||item.dsp||(item.category==="playlist"?"Spotify":null),
      genres:extractedGenres,website_url:ev.playlistUrl||finalUrl,submission_url:ev.ok?finalUrl:null,contact_email:email,
      submission_method:email?"email":(ev.ok?(/mailto:/i.test(html)?"email":"form"):"unknown"),
@@ -377,13 +398,13 @@ async function main(){
       submission_route_found:true,category_match:true,canonical_destination:true,
       independent_corroboration:true,independent_source_reachable:true,
       independent_identity_match:true,independent_source_url:corroboration.url,
-      individual_playlist_url:ev.spotifyUrl||null,verified_at:now(),
+      individual_playlist_url:ev.playlistUrl||null,verified_at:now(),
       verification_method:"live publisher-page inspection plus independent reachable source corroborating identity and category"}:null,
       auto_verified_at:ev.ok&&corroboration.ok?now():null}:{})};
     const inserted=await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(candidate)});
     const saved=Array.isArray(inserted)?inserted[0]:null;
     if(!saved?.id)throw new Error("Candidate insert did not return an ID; automatic publication withheld");
-    queued++;queuedDetails.push({id:saved.id,category:item.category,name,source_url:finalUrl,submission_url:candidate.submission_url,contact_email:email,provider:hit.provider||"unknown"});
+    queued++;queuedDetails.push({id:saved.id,category:"playlist",name,source_url:finalUrl,playlist_url:ev.playlistUrl,follower_count:followerCount,response_rate:responseRate,activity_status:activityStatus,genres:extractedGenres,submission_url:candidate.submission_url,contact_email:email,provider:hit.provider||"unknown"});
     if(ev.ok&&autoPublicationEnabled){
      try{
       const publication=await rest("rpc/auto_publish_verified_opportunity_candidate",{method:"POST",body:JSON.stringify({p_candidate_id:saved.id})});
