@@ -99,7 +99,7 @@ async function main(){
  }
  const status=errors.length?(done?"partial":"failed"):"completed";
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
-  finished_at:now(),status,searches_run:done,candidates_seen:seen,candidates_queued:queued,records_added:0,records_updated:0,
+  finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:0,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
  console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,errors},null,2));
  if(!done)process.exitCode=1;
