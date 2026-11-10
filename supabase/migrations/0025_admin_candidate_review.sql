@@ -17,7 +17,7 @@ DECLARE
   created_new boolean := false;
 BEGIN
   IF NOT public.is_site_admin() THEN RAISE EXCEPTION 'Admin access required'; END IF;
-  IF p_decision NOT IN ('accept','reject') THEN RAISE EXCEPTION 'Decision must be accept or reject'; END IF;
+  IF p_decision IS NULL OR p_decision NOT IN ('accept','reject') THEN RAISE EXCEPTION 'Decision must be accept or reject'; END IF;
 
   SELECT * INTO candidate
   FROM public.opportunity_discovery_candidates
