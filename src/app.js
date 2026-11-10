@@ -152,7 +152,10 @@ function populateSubmissionTargets() {
   const category = ({
     playlist: "playlist",
     radio: "radio_station",
-    website: "website"
+    website: "website",
+    curator: "curator",
+    platform: "platform",
+    contact: "contact"
   })[typeSelect.value];
   const available = directoryRecords.filter(item => item.category === category && item.is_integrated && item.accepts_submissions);
   targetSelect.innerHTML = '<option value="">Choose an integrated destination</option>' +
@@ -441,7 +444,7 @@ async function submitDirectoryOpportunity() {
     const status = byId("publicStatsStatus");
     if (status) status.textContent = "Verified opportunity totals could not be refreshed. Please retry shortly.";
   });
-  setMessage("formResult", "Submission received. One credit was charged for the verified destination.");
+  setMessage("formResult", "Submission request recorded. One credit was charged only because this destination has an enabled delivery integration.");
   await Promise.all([loadArtistSubmissions(), loadCreditBalance()]);
 }
 
