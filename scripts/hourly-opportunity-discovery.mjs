@@ -125,7 +125,7 @@ async function main(){
     try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\./,"");path=parsed.pathname.toLowerCase();}catch{}
     const genericRadioDirectories=["iheart.com","accuradio.com","radio.net","mytuner-radio.com","appradiofm.com","tunein.com","radio.garden"];
     const genericRadioLanding=genericRadioDirectories.some(domain=>host===domain||host.endsWith("."+domain))&&
-      (path==="/"||/^\\/(live|radio|home|stations?)\\/?$/.test(path));
+      (path==="/"||/^\/(live|radio|home|stations?)\/?$/.test(path));
     const spotifyDestination=host==="spotify.com"||host.endsWith(".spotify.com")||host==="spotify.link"||host.endsWith(".spotify.link");
     const submissionEvidence=ev.ok===true;
     const categoryRelevant={
