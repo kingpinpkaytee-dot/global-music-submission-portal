@@ -158,6 +158,49 @@ function evidence(category,title,snippet,html,url){
 function hostnameOf(value){
  try{return new URL(value).hostname.toLowerCase().replace(/^www\\./,"");}catch{return "";}
 }
+async function resolveGoogleNewsPublisher(hit){
+ const title=cleanName(hit.title);
+ if(!title)return null;
+ // Google News RSS sometimes returns opaque article wrappers. Search the exact
+ // headline on Bing and accept only an inspected external page whose content
+ // independently contains multiple meaningful headline terms.
+ try{
+  const u=new URL("https://www.bing.com/search");
+  u.searchParams.set("format","rss");
+  u.searchParams.set("q",'"'+title.replace(/["']/g," ")+'"');
+  u.searchParams.set("count","10");
+  const results=await fetchFeed(u,"Bing exact-headline resolution");
+  const terms=title.toLowerCase().split(/\\s+/).filter(x=>x.length>3).slice(0,6);
+  for(const item of results.slice(0,8)){
+   let candidate=item.link;
+   try{
+    const parsed=new URL(candidate);
+    if(parsed.hostname==="news.google.com"||parsed.hostname.endsWith(".news.google.com")||parsed.hostname.endsWith("bing.com"))continue;
+   }catch{continue;}
+   const overlap=terms.filter(t=>(item.title||"").toLowerCase().includes(t)).length;
+   if(overlap<Math.min(2,terms.length))continue;
+   const page=await inspect(candidate);
+   if(!page.ok)continue;
+   const body=stripTags(page.html||"").toLowerCase();
+   const pageOverlap=terms.filter(t=>body.includes(t)).length;
+   if(pageOverlap>=Math.min(2,terms.length))return page.finalUrl||candidate;
+  }
+ }catch{}
+ // Last attempt: follow the Google News redirect and inspect canonical metadata.
+ try{
+  const page=await inspect(hit.link);
+  if(page.ok){
+   const html=String(page.html||"");
+   const canonical=html.match(/<link[^>]+rel=["'](?:canonical|alternate)["'][^>]+href=["']([^"']+)["']/i)
+    ||html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
+   if(canonical){
+    const target=new URL(decodeHtml(canonical[1]),page.finalUrl||hit.link);
+    if(!/(^|\\.)news\\.google\\.com$/i.test(target.hostname))return target.toString();
+   }
+  }
+ }catch{}
+ return null;
+}
 async function findIndependentCorroboration(category,name,primaryUrl,spotifyUrl){
  const primaryHost=hostnameOf(primaryUrl);
  const queryName=String(name||"").replace(/[^\\p{L}\\p{N} ]/gu," ").replace(/\\s+/g," ").trim().slice(0,100);
@@ -221,7 +264,13 @@ async function main(){
      rejectedDetails.push({category:item.category,name:cleanName(hit.title),url,provider:hit.provider||"unknown",evidenceReason:"Excluded known dictionary or unrelated submission-platform noise"});
      rejected++;continue;
     }
-    if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))url=googleNewsEmbeddedUrl(url)||url;
+    if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com")){
+     url=googleNewsEmbeddedUrl(url)||await resolveGoogleNewsPublisher(hit);
+     if(!url){
+      rejectedDetails.push({category:item.category,name:cleanName(hit.title),url:hit.link,provider:hit.provider||"unknown",evidenceReason:"Google News article destination could not be independently resolved"});
+      rejected++;continue;
+     }
+    }
     let page=await inspect(url);
     if((urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))&&page.ok){
      let finalHost="";try{finalHost=new URL(page.finalUrl||url).hostname.toLowerCase();}catch{}
