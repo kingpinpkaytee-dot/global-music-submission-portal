@@ -66,19 +66,19 @@ async function search(q){
    u.searchParams.set("q",q);u.searchParams.set("hl","en-ZA");u.searchParams.set("gl","ZA");u.searchParams.set("ceid","ZA:en");
    return fetchFeed(u,"Google News RSS");
   }},
-  {name:"DuckDuckGo HTML",run:async()=>{
-   const u=new URL("https://html.duckduckgo.com/html/");u.searchParams.set("q",q);
-   const res=await fetch(u,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
+  {name:"DuckDuckGo Lite",run:async()=>{
+   const u=new URL("https://lite.duckduckgo.com/lite/");u.searchParams.set("q",q);
+   const res=await fetch(u,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
    const html=await res.text();
-   if(!res.ok)throw new Error("DuckDuckGo HTML HTTP "+res.status+": "+html.slice(0,160));
-   const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
+   if(!res.ok)throw new Error("DuckDuckGo Lite HTTP "+res.status+": "+html.slice(0,220).replace(/\s+/g," "));
+   const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result-link[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
    const items=anchors.map(m=>{
     const href=m[1].match(/href=["']([^"']+)["']/i);let link=href?decodeHtml(href[1]):"";
     try{const p=new URL(link);if(p.hostname.includes("duckduckgo.com")&&p.searchParams.has("uddg"))link=p.searchParams.get("uddg");}catch{}
-    const near=html.slice(m.index,m.index+5000),snip=near.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
+    const near=html.slice(m.index,m.index+3500),snip=near.match(/class=["'][^"']*result-snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
     return {title:stripTags(m[2]),link,snippet:snip?stripTags(snip[1]):""};
    }).filter(x=>/^https?:\/\//i.test(x.link));
-   if(!items.length)throw new Error("DuckDuckGo returned no result anchors (bytes="+html.length+")");
+   if(!items.length)throw new Error("DuckDuckGo Lite returned no result-link anchors (bytes="+html.length+", preview="+html.slice(0,180).replace(/\s+/g," ")+")");
    return items;
   }}
  ];
@@ -146,14 +146,14 @@ function evidence(category,title,snippet,html,url){
 }
 async function main(){
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of queries){
   try{
    const searchResult=await search(item.q);done++;
    for(const [provider,stats] of Object.entries(searchResult.providerStats||{})){
     providerStats[provider]??={queries:0,results:0,failures:0};
     providerStats[provider].queries++;providerStats[provider].results+=stats.count||0;
-    if(stats.error)providerStats[provider].failures++;
+    if(stats.error){providerStats[provider].failures++;providerDiagnostics[provider]??=[];providerDiagnostics[provider].push({query:item.q,error:stats.error});}
    }
    for(const hit of searchResult.items){
     const categoryKey=item.category+"|"+hit.link.toLowerCase();
@@ -163,15 +163,14 @@ async function main(){
     if(processedByCategory[item.category]>12)continue;
     seen++;const url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
-    // Google News RSS article wrappers are discovery references, not destination pages.
-    // Do not mistake a Google News wrapper for a verified publisher submission route.
+    // Follow Google News RSS redirects once; retain only real publisher destinations.
     let urlHost="";
     try{urlHost=new URL(url).hostname.toLowerCase();}catch{}
-    if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com")){
-     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url,provider:hit.provider||"Google News RSS",evidenceReason:"Google News article wrapper; publisher destination not resolved",searchSnippet:(hit.snippet||"").slice(0,350)});
-     rejected++;continue;
+    let page=await inspect(url);
+    if((urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))&&page.ok){
+     let finalHost="";try{finalHost=new URL(page.finalUrl||url).hostname.toLowerCase();}catch{}
+     if(finalHost==="news.google.com"||finalHost.endsWith(".news.google.com"))page={ok:false,reason:"Google News wrapper did not expose a publisher destination"};
     }
-    const page=await inspect(url);
     const ev=page.ok?evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url):{ok:false,reason:page.reason||"Destination could not be inspected; manual review required"};
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
@@ -225,7 +224,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:0,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
