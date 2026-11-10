@@ -14,6 +14,7 @@ AS $$
 DECLARE
   candidate public.opportunity_discovery_candidates%ROWTYPE;
   saved_id uuid;
+  created_new boolean := false;
 BEGIN
   IF NOT public.is_site_admin() THEN RAISE EXCEPTION 'Admin access required'; END IF;
   IF p_decision NOT IN ('accept','reject') THEN RAISE EXCEPTION 'Decision must be accept or reject'; END IF;
@@ -61,10 +62,11 @@ BEGIN
       coalesce(candidate.last_checked_at,now()),candidate.evidence_url,'admin_verified',
       false,false
     ) RETURNING id INTO saved_id;
+    created_new := true;
   END IF;
 
   UPDATE public.opportunity_discovery_candidates
-  SET review_status=CASE WHEN saved_id IS NULL THEN 'duplicate' ELSE 'accepted' END,
+  SET review_status=CASE WHEN created_new THEN 'accepted' ELSE 'duplicate' END,
       reviewed_by=auth.uid(),reviewed_at=now(),directory_id=saved_id
   WHERE id=p_candidate_id;
 
