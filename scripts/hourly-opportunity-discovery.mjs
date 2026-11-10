@@ -30,33 +30,52 @@ function decodeHtml(s){
  return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
 function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\s+/g," ").trim();}
+function rssItems(xml){
+ const source=String(xml||"");
+ const blocks=[...source.matchAll(/<(?:item|entry)\b[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi)];
+ return blocks.map(m=>{
+  const block=m[1];
+  const field=(tag)=>{const x=block.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));return x?stripTags(x[1].replace(/^<!\[CDATA\[|\]\]>$/g,"")):"";};
+  let link=field("link");
+  if(!link){const x=block.match(/<link\b[^>]*href=["']([^"']+)["']/i);if(x)link=decodeHtml(x[1]);}
+  return {title:field("title"),link,snippet:field("description")||field("summary")};
+ }).filter(x=>/^https?:\/\//i.test(x.link));
+}
+async function fetchFeed(url,label){
+ const res=await fetch(url,{headers:{"Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"},signal:AbortSignal.timeout(18000)});
+ const body=await res.text();
+ if(!res.ok)throw new Error(label+" HTTP "+res.status+": "+body.slice(0,160).replace(/\s+/g," "));
+ const items=rssItems(body);
+ if(items.length)return items;
+ throw new Error(label+" returned no parseable results (type="+(res.headers.get("content-type")||"unknown")+", bytes="+body.length+", preview="+body.slice(0,100).replace(/\s+/g," ")+")");
+}
 async function search(q){
- const u=new URL("https://www.bing.com/search");
- u.searchParams.set("format","rss");u.searchParams.set("q",q);u.searchParams.set("count","10");
+ const failures=[];
+ const bing=new URL("https://www.bing.com/search");
+ bing.searchParams.set("format","rss");bing.searchParams.set("q",q);bing.searchParams.set("count","20");
+ try{return await fetchFeed(bing,"Bing RSS");}catch(e){failures.push(e.message);}
+ const googleNews=new URL("https://news.google.com/rss/search");
+ googleNews.searchParams.set("q",q);googleNews.searchParams.set("hl","en-US");googleNews.searchParams.set("gl","US");googleNews.searchParams.set("ceid","US:en");
+ try{return await fetchFeed(googleNews,"Google News RSS");}catch(e){failures.push(e.message);}
  try{
-  const res=await fetch(u,{headers:{"Accept":"application/rss+xml, application/xml;q=0.9, */*;q=0.8","User-Agent":"Mozilla/5.0 ArtistFrequencyOpportunityResearch/1.2"},signal:AbortSignal.timeout(15000)});
-  const xml=await res.text();
-  if(!res.ok)throw new Error("Bing RSS "+res.status+": "+xml.slice(0,240));
-  const items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].map(m=>{
-   const field=(tag)=>{const x=m[1].match(new RegExp("<"+tag+"[^>]*>([\s\S]*?)<\/"+tag+">","i"));return x?stripTags(x[1]):"";};
-   return {title:field("title"),link:field("link"),snippet:field("description")};
-  }).filter(x=>/^https?:\/\//i.test(x.link));
-  if(items.length)return items;
-  throw new Error("Bing RSS returned no parseable results");
- }catch(bingError){
   const ddg=new URL("https://html.duckduckgo.com/html/");
   ddg.searchParams.set("q",q);
-  const res=await fetch(ddg,{headers:{"User-Agent":"Mozilla/5.0 (compatible; ArtistFrequencyOpportunityResearch/1.2)","Accept":"text/html"},signal:AbortSignal.timeout(15000)});
+  const res=await fetch(ddg,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
   const html=await res.text();
-  if(!res.ok)throw new Error("Bing failed ("+bingError.message+"); DuckDuckGo HTML "+res.status);
-  const items=[...html.matchAll(/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m=>{
-   let link=decodeHtml(m[1]);try{const parsed=new URL(link);if(parsed.hostname.includes("duckduckgo.com")&&parsed.searchParams.has("uddg"))link=parsed.searchParams.get("uddg");}catch{}
-   const snippetMatch=html.slice(m.index,m.index+3500).match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
-   return {title:stripTags(m[2]),link,snippet:snippetMatch?stripTags(snippetMatch[1]):""};
+  if(!res.ok)throw new Error("DuckDuckGo HTML HTTP "+res.status+": "+html.slice(0,160));
+  const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
+  const items=anchors.map(m=>{
+   const href=m[1].match(/href=["']([^"']+)["']/i);
+   let link=href?decodeHtml(href[1]):"";
+   try{const parsed=new URL(link);if(parsed.hostname.includes("duckduckgo.com")&&parsed.searchParams.has("uddg"))link=parsed.searchParams.get("uddg");}catch{}
+   const near=html.slice(m.index,m.index+5000);
+   const snip=near.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
+   return {title:stripTags(m[2]),link,snippet:snip?stripTags(snip[1]):""};
   }).filter(x=>/^https?:\/\//i.test(x.link));
-  if(!items.length)throw new Error("Bing failed ("+bingError.message+"); DuckDuckGo returned no parseable results");
-  return items;
- }
+  if(items.length)return items;
+  throw new Error("DuckDuckGo returned no result anchors (type="+(res.headers.get("content-type")||"unknown")+", bytes="+html.length+", preview="+html.slice(0,100).replace(/\s+/g," ")+")");
+ }catch(e){failures.push(e.message);}
+ throw new Error(failures.join("; "));
 }
 async function inspect(url){
  try{
