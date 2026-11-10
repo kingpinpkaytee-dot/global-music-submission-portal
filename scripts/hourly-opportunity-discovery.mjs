@@ -27,9 +27,9 @@ async function rest(path,options={}){
  return request(SUPABASE_URL+"/rest/v1/"+path,{...options,headers:{...headers,...options.headers}},"Supabase");
 }
 function decodeHtml(s){
- return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
+ return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
-function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\\s+/g," ").trim();}
+function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\s+/g," ").trim();}
 async function search(q){
  const u=new URL("https://www.bing.com/search");
  u.searchParams.set("format","rss");u.searchParams.set("q",q);u.searchParams.set("count","10");
@@ -37,10 +37,10 @@ async function search(q){
   const res=await fetch(u,{headers:{"Accept":"application/rss+xml, application/xml;q=0.9, */*;q=0.8","User-Agent":"Mozilla/5.0 ArtistFrequencyOpportunityResearch/1.2"},signal:AbortSignal.timeout(15000)});
   const xml=await res.text();
   if(!res.ok)throw new Error("Bing RSS "+res.status+": "+xml.slice(0,240));
-  const items=[...xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)].map(m=>{
-   const field=(tag)=>{const x=m[1].match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)<\\/"+tag+">","i"));return x?stripTags(x[1]):"";};
+  const items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].map(m=>{
+   const field=(tag)=>{const x=m[1].match(new RegExp("<"+tag+"[^>]*>([\s\S]*?)<\/"+tag+">","i"));return x?stripTags(x[1]):"";};
    return {title:field("title"),link:field("link"),snippet:field("description")};
-  }).filter(x=>/^https?:\\/\\//i.test(x.link));
+  }).filter(x=>/^https?:\/\//i.test(x.link));
   if(items.length)return items;
   throw new Error("Bing RSS returned no parseable results");
  }catch(bingError){
@@ -49,11 +49,11 @@ async function search(q){
   const res=await fetch(ddg,{headers:{"User-Agent":"Mozilla/5.0 (compatible; ArtistFrequencyOpportunityResearch/1.2)","Accept":"text/html"},signal:AbortSignal.timeout(15000)});
   const html=await res.text();
   if(!res.ok)throw new Error("Bing failed ("+bingError.message+"); DuckDuckGo HTML "+res.status);
-  const items=[...html.matchAll(/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi)].map(m=>{
+  const items=[...html.matchAll(/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m=>{
    let link=decodeHtml(m[1]);try{const parsed=new URL(link);if(parsed.hostname.includes("duckduckgo.com")&&parsed.searchParams.has("uddg"))link=parsed.searchParams.get("uddg");}catch{}
-   const snippetMatch=html.slice(m.index,m.index+3500).match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i);
+   const snippetMatch=html.slice(m.index,m.index+3500).match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
    return {title:stripTags(m[2]),link,snippet:snippetMatch?stripTags(snippetMatch[1]):""};
-  }).filter(x=>/^https?:\\/\\//i.test(x.link));
+  }).filter(x=>/^https?:\/\//i.test(x.link));
   if(!items.length)throw new Error("Bing failed ("+bingError.message+"); DuckDuckGo returned no parseable results");
   return items;
  }
