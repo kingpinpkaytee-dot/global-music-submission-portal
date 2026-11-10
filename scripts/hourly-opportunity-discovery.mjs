@@ -143,6 +143,9 @@ function evidence(category,title,snippet,html,url){
  return {ok:true,directPageEvidence:true,routeFound:true,categoryMatch:true};
 }
 async function main(){
+ let autoPublicationEnabled=true;
+ try{await rest("opportunity_discovery_candidates?select=auto_verification&limit=0");}
+ catch(e){autoPublicationEnabled=false;console.log("AUTOPUBLISH_DISABLED: database migration 0028 is not active or schema cache is stale; discovery will continue without publishing. "+String(e.message||e).slice(0,250));}
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
  const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of queries){
@@ -220,16 +223,16 @@ async function main(){
      accepts_free_submissions:false,
      activity_status:"unknown",source_name:"Public Web Search (Bing RSS / Google News RSS)",
      source_url:finalUrl,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending",
-     auto_verification:ev.ok?{schema_version:"1",score:96,reachable:true,direct_page_evidence:true,
+     ...(autoPublicationEnabled?{auto_verification:ev.ok?{schema_version:"1",score:96,reachable:true,direct_page_evidence:true,
       submission_route_found:true,category_match:true,canonical_destination:true,
       individual_playlist_url:ev.spotifyUrl||null,verified_at:now(),
       verification_method:"live HTTP inspection of publisher page; submission language and route found on page"}:null,
-     auto_verified_at:ev.ok?now():null};
+      auto_verified_at:ev.ok?now():null}:{})};
     const inserted=await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(candidate)});
     const saved=Array.isArray(inserted)?inserted[0]:null;
     if(!saved?.id)throw new Error("Candidate insert did not return an ID; automatic publication withheld");
     queued++;queuedDetails.push({id:saved.id,category:item.category,name,source_url:finalUrl,submission_url:candidate.submission_url,contact_email:email,provider:hit.provider||"unknown"});
-    if(ev.ok){
+    if(ev.ok&&autoPublicationEnabled){
      try{
       const publication=await rest("rpc/auto_publish_verified_opportunity_candidate",{method:"POST",body:JSON.stringify({p_candidate_id:saved.id})});
       const result=Array.isArray(publication)?publication[0]:publication;
