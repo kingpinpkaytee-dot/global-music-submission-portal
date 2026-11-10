@@ -168,7 +168,7 @@ function extractDspPlaylist(html,url,snippet){
  return null;
 }
 function parseCount(raw){
- const value=String(raw||"").replace(/,/g,"").replace(/\\s/gi,"").toLowerCase();
+ const value=String(raw||"").replace(/,/g,"").replace(/\s/gi,"").toLowerCase();
  const n=parseFloat(value);
  if(!Number.isFinite(n))return null;
  return Math.round(n*(value.endsWith("k")?1000:value.endsWith("m")?1000000:value.endsWith("b")?1000000000:1));
@@ -176,20 +176,20 @@ function parseCount(raw){
 function extractPlaylistMetrics(value){
  const text=stripTags(String(value||"")).replace(/&nbsp;/gi," ");
  const followerPatterns=[
-  /(?:followers|follower count|playlist followers)\\s*[:\\-]?\\s*([0-9][0-9,.]*\\s*[kmb]?)/i,
-  /([0-9][0-9,.]*\\s*[kmb]?)\\s+followers\\b/i
+  /(?:followers|follower count|playlist followers)\s*[:\-]?\s*([0-9][0-9,.]*\s*[kmb]?)/i,
+  /([0-9][0-9,.]*\s*[kmb]?)\s+followers\b/i
  ];
  let followerCount=null;
  for(const re of followerPatterns){const m=text.match(re);if(m){followerCount=parseCount(m[1]);if(followerCount!==null)break;}}
  const responsePatterns=[
-  /response\\s*rate\\s*[:\\-]?\\s*(100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)\\s*%/i,
-  /(100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)\\s*%\\s*(?:response\\s*rate)/i,
-  /responds?\\s+to\\s+(100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)\\s*%/i
+  /response\s*rate\s*[:\-]?\s*(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%/i,
+  /(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%\s*(?:response\s*rate)/i,
+  /responds?\s+to\s+(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%/i
  ];
  let responseRate=null;
  for(const re of responsePatterns){const m=text.match(re);if(m){responseRate=Number(m[1]);if(Number.isFinite(responseRate))break;}}
- const activeEvidence=/(?:status|curator status|playlist status|account status)\\s*[:\\-]?\\s*active\\b|\\bactive\\s+(?:curator|playlist|profile)\\b|\\blast active\\b|\\bcurrently active\\b/i.test(text);
- const inactiveEvidence=/\\b(?:inactive|paused|closed|disabled|not active)\\b/i.test(text);
+ const activeEvidence=/(?:status|curator status|playlist status|account status)\s*[:\-]?\s*active\b|\bactive\s+(?:curator|playlist|profile)\b|\blast active\b|\bcurrently active\b/i.test(text);
+ const inactiveEvidence=/\b(?:inactive|paused|closed|disabled|not active)\b/i.test(text);
  return {followerCount,responseRate,activityStatus:activeEvidence&&!inactiveEvidence?"active":"unknown",activeEvidence,inactiveEvidence};
 }
 function evidence(category,title,snippet,html,url){
