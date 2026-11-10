@@ -122,7 +122,7 @@ async function main(){
     const finalUrl=page.finalUrl||url;
     const searchable=(name+" "+(hit.snippet||"")+" "+(page.html||"").slice(0,30000)).toLowerCase();
     let host="",path="";
-    try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\\./,"");path=parsed.pathname.toLowerCase();}catch{}
+    try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\./,"");path=parsed.pathname.toLowerCase();}catch{}
     const genericRadioDirectories=["iheart.com","accuradio.com","radio.net","mytuner-radio.com","appradiofm.com","tunein.com","radio.garden"];
     const genericRadioLanding=genericRadioDirectories.some(domain=>host===domain||host.endsWith("."+domain))&&
       (path==="/"||/^\\/(live|radio|home|stations?)\\/?$/.test(path));
