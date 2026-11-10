@@ -42,7 +42,6 @@ BEGIN
         lower(d.name) = lower(candidate.name)
         OR lower(coalesce(d.source_url, '')) = lower(candidate.source_url)
       )
-    ORDER BY d.created_at ASC NULLS LAST
     LIMIT 1;
 
     IF saved_id IS NOT NULL THEN
