@@ -101,6 +101,7 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
     if (filter === "curator") return item.category === "curator";
     if (filter === "blogger") return item.category === "blogger";
     if (filter === "platform") return item.category === "platform";
+    if (filter === "contact") return item.category === "contact";
     return true;
   });
 
@@ -141,7 +142,10 @@ function renderOpportunityCards(filter = currentOpportunityFilter) {
       : "";
     const linkLabel = item.category === "playlist" ? "Submit track ↗" : "View destination ↗";
     const linkHtml = link ? '<p style="margin-top:12px"><a class="btn" rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">' + linkLabel + '</a></p>' : "";
-    return '<article class="opportunity"><div class="award"><span class="award-mark">🏆</span> VERIFIED & APPROVED</div><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + curatorHtml + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + spotifyLinkHtml + linkHtml + '</article>';
+    const email = String(item.contact_email || "").trim();
+    const emailHtml = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)
+      ? '<p class="form-note">Verified contact: <a href="mailto:' + escapeHtml(email) + '">' + escapeHtml(email) + '</a></p>' : "";
+    return '<article class="opportunity"><div class="award"><span class="award-mark">🏆</span> VERIFIED & APPROVED</div><div class="eyebrow">' + category + '</div><h3>' + title + '</h3><p>' + description + '</p>' + tags + curatorHtml + emailHtml + '<p class="form-note">' + escapeHtml(submissionStatus) + '</p>' + spotifyLinkHtml + linkHtml + '</article>';
   }).join("");
 }
 
@@ -200,7 +204,7 @@ async function loadDirectory() {
   if (!supabase) return;
   const { data, error } = await supabase
     .from("opportunity_directories")
-    .select("id,category,name,country,website_url,submission_url,curator_name,curator_profile_url,genres,is_integrated,accepts_submissions,accepts_free_submissions,activity_status,follower_count,approval_rate,response_rate,curator_interaction_score,last_checked_at,source_url,source_evidence_url,data_confidence")
+    .select("id,category,name,country,website_url,submission_url,contact_email,curator_name,curator_profile_url,genres,is_integrated,accepts_submissions,accepts_free_submissions,activity_status,follower_count,approval_rate,response_rate,curator_interaction_score,last_checked_at,source_url,source_evidence_url,data_confidence")
     .eq("is_public", true)
     .eq("is_active", true)
     .eq("is_verified", true)
