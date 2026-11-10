@@ -12,14 +12,14 @@ if(!isNewSecretKey&&SERVICE_ROLE_KEY.split(".").length!==3) throw new Error("SUP
 const headers={apikey:SERVICE_ROLE_KEY,...(isNewSecretKey?{}:{Authorization:"Bearer "+SERVICE_ROLE_KEY}),"Content-Type":"application/json"};
 // Exact-phrase searches avoid dictionary matches on the word "submit".
 const queries=[
- {category:"playlist",q:'"submit playlist" Spotify curator inurl:submit -dictionary -definition -lyrics -jobs -tips'},
- {category:"playlist",q:'"Spotify playlist submission" curator "submit track" -dictionary -definition -jobs -guide'},
- {category:"radio_station",q:'"music submissions" radio station artist "submit" -jobs -definition -directory'},
- {category:"radio_station",q:'"submit music" "radio station" "music director" form -jobs -definition'},
- {category:"blogger",q:'"submit your music" "music blog" submissions -jobs -definition -howto'},
- {category:"blogger",q:'"music submissions" blog editorial contact "send music" -jobs -definition'},
- {category:"curator",q:'"playlist curator" "submit your track" Spotify submission form -definition -lyrics'},
- {category:"curator",q:'"submit music to our playlist" Spotify curator form -definition -guide'}
+ {category:"playlist",q:'"free Spotify playlist submission" curator "submit music" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:thefreedictionary.com -site:dictionary.com -site:spotify.com -site:submittable.com -jobs -definition'},
+ {category:"playlist",q:'"submit your track" "Spotify playlist" curator form -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -site:spotify.com -guide -definition'},
+ {category:"radio_station",q:'"music submissions" "radio station" "send music" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -jobs -directory'},
+ {category:"radio_station",q:'"submit music" radio "music director" "submission form" -site:dictionary.cambridge.org -site:merriam-webster.com -jobs -definition'},
+ {category:"blogger",q:'"send us your music" "music blog" submissions -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -jobs'},
+ {category:"blogger",q:'"music blog" "submit music" "submission guidelines" -site:dictionary.cambridge.org -site:merriam-webster.com -site:vocabulary.com -howto'},
+ {category:"curator",q:'"playlist curator" "free submissions" Spotify "submit" -site:dictionary.cambridge.org -site:merriam-webster.com -site:spotify.com -definition'},
+ {category:"curator",q:'"Spotify playlist" "accepting submissions" curator -site:dictionary.cambridge.org -site:merriam-webster.com -site:spotify.com -guide'}
 ];
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
@@ -163,6 +163,12 @@ async function main(){
     // Follow Google News RSS redirects once; retain only real publisher destinations.
     let urlHost="";
     try{urlHost=new URL(url).hostname.toLowerCase();}catch{}
+    // Reject obvious dictionary/search-noise destinations before spending a page fetch.
+    const noiseHosts=["dictionary.cambridge.org","cambridge.org","merriam-webster.com","vocabulary.com","thefreedictionary.com","dictionary.com","submittable.com"];
+    if(noiseHosts.some(domain=>urlHost===domain||urlHost.endsWith("."+domain))){
+     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url,provider:hit.provider||"unknown",evidenceReason:"Excluded known dictionary or unrelated submission-platform noise"});
+     rejected++;continue;
+    }
     if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))url=googleNewsEmbeddedUrl(url)||url;
     let page=await inspect(url);
     if((urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))&&page.ok){
