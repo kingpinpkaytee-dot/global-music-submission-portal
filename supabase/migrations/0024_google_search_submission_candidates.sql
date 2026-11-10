@@ -89,6 +89,10 @@ WHERE NOT EXISTS (
  SELECT 1 FROM public.opportunity_discovery_candidates c
  WHERE c.category=v.category AND lower(c.source_url)=lower(v.source_url)
    AND lower(c.name)=lower(v.name)
+)
+AND NOT EXISTS (
+ SELECT 1 FROM public.opportunity_directories d
+ WHERE d.category=v.category AND lower(d.name)=lower(v.name)
 );
 
 COMMIT;
