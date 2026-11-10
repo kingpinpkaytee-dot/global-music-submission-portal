@@ -10,7 +10,7 @@ INSERT INTO public.opportunity_discovery_candidates (
 )
 SELECT v.category,v.name,v.country,v.dsp_name,v.genres,v.website_url,v.submission_url,
  v.contact_email,v.submission_method,v.accepts_free_submissions,'active',
- 'Google Search',v.source_url,v.source_url,now(),now(),'pending'
+ 'Public Web Search',v.source_url,v.source_url,now(),now(),'pending'
 FROM (VALUES
  ('radio_station','Radio NFM','South Africa',NULL::text,ARRAY['Independent music','All genres']::text[],
   'https://www.radionfm.co.za/','https://www.radionfm.co.za/music-submissions.php',NULL::text,'form',false,
