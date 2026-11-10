@@ -39,7 +39,20 @@ const platformPlaylistQueries=[
  {category:"playlist",dsp:"Groover",q:'site:groover.co playlist curator "response rate" active followers'},
  {category:"playlist",dsp:"SubmitLink",q:'site:submitlink.io playlist curator followers response rate active'},
  {category:"playlist",dsp:"PlaylistSupply",q:'playlist curator database "response rate" followers active'},
- {category:"playlist",dsp:"Global playlist curators",q:'music playlist curator "response rate" "followers" active submission'}
+ {category:"playlist",dsp:"Global playlist curators",q:'music playlist curator "response rate" "followers" active submission'},
+ {category:"playlist",dsp:"SubmitLink profiles",q:'site:submitlink.io/c/ "followers" "response rate" playlist curator'},
+ {category:"playlist",dsp:"SubmitLink profiles",q:'site:submitlink.io/c/ "Spotify playlist" curator followers'},
+ {category:"playlist",dsp:"SubmitHub curator profiles",q:'site:submithub.com/curators "response rate" playlist'},
+ {category:"playlist",dsp:"SubmitHub curator profiles",q:'site:submithub.com "curator" "responds to" playlist music'},
+ {category:"playlist",dsp:"Groover curator profiles",q:'site:groover.co "response rate" playlist curator'},
+ {category:"playlist",dsp:"Groover curator profiles",q:'site:groover.co "active" "playlist" curator music'},
+ {category:"playlist",dsp:"Daily Playlists curator profiles",q:'site:dailyplaylists.com curator playlist followers active'},
+ {category:"playlist",dsp:"Pitchplaylists curator profiles",q:'site:pitchplaylists.com playlist curator "followers"'},
+ {category:"playlist",dsp:"Soundplate playlist submissions",q:'site:soundplate.com playlist submit music curator Spotify playlist'},
+ {category:"playlist",dsp:"Playlist curator profiles",q:'"response rate" "Spotify playlist" curator "followers"'},
+ {category:"playlist",dsp:"Playlist curator profiles",q:'"responds to" "playlist submissions" Spotify curator'},
+ {category:"playlist",dsp:"Playlist curator profiles",q:'"last active" playlist curator music submission followers'},
+ {category:"playlist",dsp:"Playlist curator profiles",q:'"active curator" "response rate" music playlist submit'}
 ];
 const queries=[...playlistQueries,...platformPlaylistQueries];
 const now=()=>new Date().toISOString();
@@ -174,21 +187,25 @@ function parseCount(raw){
  return Math.round(n*(value.endsWith("k")?1000:value.endsWith("m")?1000000:value.endsWith("b")?1000000000:1));
 }
 function extractPlaylistMetrics(value){
- const text=stripTags(String(value||"")).replace(/&nbsp;/gi," ");
+ const raw=String(value||"");
+ // Read visible copy plus labelled metadata attributes used by curator cards.
+ // Unlabelled numbers are never promoted into follower/response metrics.
+ const attrs=[...raw.matchAll(/(?:aria-label|title|content|data-testid|data-count|data-followers|data-response-rate)\s*=\s*["']([^"']{1,500})["']/gi)].map(m=>m[1]).join(" ");
+ const text=(stripTags(raw)+" "+decodeHtml(attrs)+" "+raw.replace(/<[^>]*>/g," ")).replace(/&nbsp;/gi," ").replace(/\s+/g," ");
  const followerPatterns=[
-  /(?:followers|follower count|playlist followers)\s*[:\-]?\s*([0-9][0-9,.]*\s*[kmb]?)/i,
+  /(?:followers|follower count|playlist followers|follower_count|followers_count|followersCount)\s*["']?\s*[:=\-]?\s*["']?([0-9][0-9,.]*\s*[kmb]?)/i,
   /([0-9][0-9,.]*\s*[kmb]?)\s+followers\b/i
  ];
  let followerCount=null;
  for(const re of followerPatterns){const m=text.match(re);if(m){followerCount=parseCount(m[1]);if(followerCount!==null)break;}}
  const responsePatterns=[
-  /response\s*rate\s*[:\-]?\s*(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%/i,
+  /(?:response\s*rate|response_rate|responseRate)\s*["']?\s*[:=\-]?\s*["']?(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%?/i,
   /(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%\s*(?:response\s*rate)/i,
   /responds?\s+to\s+(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%/i
  ];
  let responseRate=null;
  for(const re of responsePatterns){const m=text.match(re);if(m){responseRate=Number(m[1]);if(Number.isFinite(responseRate))break;}}
- const activeEvidence=/(?:status|curator status|playlist status|account status)\s*[:\-]?\s*active\b|\bactive\s+(?:curator|playlist|profile)\b|\blast active\s*(?:today|yesterday|[0-9]{1,2}\s+(?:hours?|days?)\s+ago)\b|\bactive within (?:[0-9]{1,2} days?|30 days)\b|\bcurrently active\b/i.test(text);
+ const activeEvidence=/(?:status|curator status|playlist status|account status|activity_status)\s*["']?\s*[:=\-]?\s*["']?active\b|\bactive\s+(?:curator|playlist|profile)\b|\blast active\s*(?:today|yesterday|[0-9]{1,2}\s+(?:hours?|days?)\s+ago)\b|\bactive within (?:[0-9]{1,2} days?|30 days)\b|\bcurrently active\b/i.test(text);
  const inactiveEvidence=/\b(?:inactive|paused|closed|disabled|not active)\b/i.test(text);
  return {followerCount,responseRate,activityStatus:activeEvidence&&!inactiveEvidence?"active":"unknown",activeEvidence,inactiveEvidence};
 }
