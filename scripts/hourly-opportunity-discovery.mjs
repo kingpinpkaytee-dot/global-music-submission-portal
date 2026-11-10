@@ -344,7 +344,7 @@ async function main(){
      platform:submissionEvidence&&/(music submission|submission portal|playlist|radio|blog|curator|submit)/i.test(searchable)
     }[item.category]===true;
     if(!categoryRelevant){
-     rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",spotifyDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
+     rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",dspDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
      // Rejected search noise is recorded in the run diagnostics, not inserted
      // into the admin candidate table. This keeps the review queue clean and
      // avoids treating unqualified search results as candidate records.
