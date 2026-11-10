@@ -651,7 +651,7 @@ function renderAdminCandidates() {
     const websiteLink = safeHttpUrl(item.website_url);
     const sourceLink = safeHttpUrl(item.source_url);
     const evidenceLink = safeHttpUrl(item.evidence_url);
-    const hasRoute = Boolean(submissionLink || (item.contact_email && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(item.contact_email).trim())));
+    const hasRoute = Boolean(submissionLink || (item.contact_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(item.contact_email).trim())));
     const canApprove = Boolean(sourceLink && evidenceLink && hasRoute);
     const linkHtml = submissionLink ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(submissionLink) + '">Open submission route ↗</a>' : (websiteLink ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(websiteLink) + '">Open official website ↗</a>' : "");
     const evidenceHtml = evidenceLink ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(evidenceLink) + '">Open evidence ↗</a>' : '<span class="muted">Evidence URL missing</span>';
@@ -664,8 +664,8 @@ function renderAdminCandidates() {
     return '<article class="track" style="align-items:flex-start"><div style="flex:1"><b>' + escapeHtml(item.name) + '</b><br><span class="muted">' +
       escapeHtml(String(item.category || "").replaceAll("_"," ")) + ' · ' + escapeHtml(item.source_name || "Google Search") +
       '</span><div style="margin:8px 0">' + tags + '</div>' + emailHtml +
-      '<p class="form-note">' + linkHtml + (item.source_url ? ' · <a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(item.source_url) + '">Source ↗</a>' : "") + '</p>' +
-      '</div><div class="auth-actions"><button type="button" class="btn primary" data-candidate-review="accept" data-candidate-id="' + escapeHtml(item.id) + '">Approve & publish</button>' +
+      '<p class="form-note">' + linkHtml + (sourceLink ? ' · <a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(sourceLink) + '">Source ↗</a>' : "") + ' · ' + evidenceHtml + '</p>' + reasonHtml +
+      '</div><div class="auth-actions"><button type="button" class="btn primary" data-candidate-review="accept" data-candidate-id="' + escapeHtml(item.id) + '" ' + (canApprove ? "" : 'disabled title="Missing source, evidence, or submission route"') + '>Approve & publish</button>' +
       '<button type="button" class="btn" data-candidate-review="reject" data-candidate-id="' + escapeHtml(item.id) + '">Reject</button></div></article>';
   }).join("");
 }
