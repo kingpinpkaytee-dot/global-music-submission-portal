@@ -19,10 +19,10 @@ jobs:
           node-version: "20"
       - name: Validate configuration
         env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_URL: https://mdcvewnevgsgmyfnybgn.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-          GOOGLE_CSE_ID: ${{ vars.GOOGLE_CSE_ID }}
+          GOOGLE_CSE_ID: d54a5ff6d8afc44d4
         run: |
           test -n "$SUPABASE_URL" || (echo "::error::Missing Actions variable SUPABASE_URL"; exit 1)
           case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo "::error::SUPABASE_URL must be the project URL ending in .supabase.co (not an API key or payment key)"; exit 1 ;; esac
@@ -31,8 +31,8 @@ jobs:
           test -n "$GOOGLE_CSE_API_KEY" || (echo "::error::Missing Actions secret GOOGLE_CSE_API_KEY"; exit 1)
       - name: Discover, verify and update opportunities
         env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_URL: https://mdcvewnevgsgmyfnybgn.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-          GOOGLE_CSE_ID: ${{ vars.GOOGLE_CSE_ID }}
+          GOOGLE_CSE_ID: d54a5ff6d8afc44d4
         run: node scripts/hourly-opportunity-discovery.mjs
