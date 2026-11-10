@@ -647,13 +647,20 @@ function renderAdminCandidates() {
   }
   root.className = "";
   root.innerHTML = adminDiscoveryCandidates.map(item => {
-    const link = safeHttpUrl(item.submission_url || item.website_url || item.source_url);
-    const linkHtml = link ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(link) + '">Open submission evidence ↗</a>' : "";
+    const submissionLink = safeHttpUrl(item.submission_url);
+    const websiteLink = safeHttpUrl(item.website_url);
+    const sourceLink = safeHttpUrl(item.source_url);
+    const evidenceLink = safeHttpUrl(item.evidence_url);
+    const hasRoute = Boolean(submissionLink || (item.contact_email && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(item.contact_email).trim())));
+    const canApprove = Boolean(sourceLink && evidenceLink && hasRoute);
+    const linkHtml = submissionLink ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(submissionLink) + '">Open submission route ↗</a>' : (websiteLink ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(websiteLink) + '">Open official website ↗</a>' : "");
+    const evidenceHtml = evidenceLink ? '<a rel="noopener noreferrer" target="_blank" href="' + escapeHtml(evidenceLink) + '">Open evidence ↗</a>' : '<span class="muted">Evidence URL missing</span>';
+    const reasonHtml = item.verification_reason ? '<p class="form-note"><b>Review notes:</b> ' + escapeHtml(item.verification_reason) + '</p>' : "";
     const email = String(item.contact_email || "").trim();
     const emailHtml = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
       ? '<p class="form-note">Contact: <a href="mailto:' + escapeHtml(email) + '">' + escapeHtml(email) + '</a></p>' : "";
     const tags = [item.country || "Global", ...(item.genres || []), item.submission_method || "route unknown",
-      item.accepts_free_submissions ? "Free route stated" : "Fee not confirmed"].map(x => '<span class="tag">' + escapeHtml(x) + '</span>').join(" ");
+      item.activity_status || "activity unknown", item.accepts_free_submissions ? "Free route stated" : "Fee not confirmed"].map(x => '<span class="tag">' + escapeHtml(x) + '</span>').join(" ");
     return '<article class="track" style="align-items:flex-start"><div style="flex:1"><b>' + escapeHtml(item.name) + '</b><br><span class="muted">' +
       escapeHtml(String(item.category || "").replaceAll("_"," ")) + ' · ' + escapeHtml(item.source_name || "Google Search") +
       '</span><div style="margin:8px 0">' + tags + '</div>' + emailHtml +
@@ -668,7 +675,7 @@ async function loadAdminCandidates() {
   const root = byId("candidateReviewList");
   if (root) root.textContent = "Loading pending Google Search candidates…";
   const { data, error } = await supabase.from("opportunity_discovery_candidates")
-    .select("id,category,name,country,dsp_name,genres,website_url,submission_url,contact_email,submission_method,accepts_free_submissions,activity_status,source_name,source_url,evidence_url,review_status,created_at")
+    .select("id,category,name,country,dsp_name,genres,website_url,submission_url,contact_email,submission_method,accepts_free_submissions,activity_status,source_name,source_url,evidence_url,verification_reason,review_status,created_at")
     .eq("review_status","pending").order("created_at",{ascending:false}).limit(100);
   if (error) throw error;
   adminDiscoveryCandidates = data || [];
