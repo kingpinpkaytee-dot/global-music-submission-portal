@@ -20,7 +20,7 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 ## Production status — 9 November 2026
 
-The Supabase production project is linked and migrations **0001–0015** are applied.
+The Supabase production project is linked and migrations **0001–0015** are applied. Migration **0016** is committed but still requires production application and verification.
 
 - **11/11 public tables have RLS enabled.**
 - **21 RLS policies** are installed.
@@ -76,6 +76,7 @@ The frontend has passed JavaScript ES-module syntax checks and a static DOM-bind
 - `supabase/migrations/0013_restrict_updated_at_trigger_execution.sql` — removes direct browser-role execution of the updated-at trigger helper.
 - `supabase/migrations/0014_artist_profile_genres_and_press_kit.sql` — structured artist genre and press-kit fields.
 - `supabase/migrations/0015_secure_opportunity_directory_acceptance.sql` — integration and acceptance gates, admin directory RPC and credit-spend eligibility checks.
+- `supabase/migrations/0016_expand_submission_destinations.sql` — adds curator, promotion-platform and industry-contact submission categories while retaining trusted delivery-integration and acceptance gates.
 - `src/supabase-client.js` — one shared Supabase client and safe public-key configuration check.
 - `src/auth.js` — email/password, Google OAuth, session handling and sign-out.
 - `src/app.js` — live public data, artist dashboard, submissions, campaigns, Marketplace and admin moderation integration.
