@@ -3,6 +3,9 @@
 -- the trusted delivery-integration gate. No destination is auto-enabled.
 BEGIN;
 
+ALTER TABLE public.hourly_opportunity_discovery_runs
+  ADD COLUMN IF NOT EXISTS candidates_queued integer NOT NULL DEFAULT 0 CHECK (candidates_queued >= 0);
+
 ALTER TABLE public.opportunity_directories
   DROP CONSTRAINT IF EXISTS opportunity_directories_category_check;
 ALTER TABLE public.opportunity_directories
