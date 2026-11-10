@@ -1,11 +1,9 @@
-// Google Programmable Search discovery for Artist Frequency.
+// Public web-search discovery for Artist Frequency (Bing RSS, DuckDuckGo HTML fallback).
 // Candidates are queued for administrator review. This worker never publishes
 // directory entries or enables submissions.
 const SUPABASE_URL=process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GOOGLE_API_KEY=process.env.GOOGLE_CSE_API_KEY;
-const GOOGLE_CX=process.env.GOOGLE_CSE_ID;
-if(![SUPABASE_URL,SERVICE_ROLE_KEY,GOOGLE_API_KEY,GOOGLE_CX].every(Boolean)) throw new Error("Missing required Supabase or Google CSE configuration.");
+if(![SUPABASE_URL,SERVICE_ROLE_KEY].every(Boolean)) throw new Error("Missing required Supabase configuration.");
 // Supabase's newer sb_secret_* keys are API keys, not JWTs: send them only
 // in apikey. Legacy service_role keys are JWTs and may also be sent as Bearer.
 const isNewSecretKey=SERVICE_ROLE_KEY.startsWith("sb_secret_");
@@ -28,10 +26,37 @@ async function request(url,options={},label="request"){
 async function rest(path,options={}){
  return request(SUPABASE_URL+"/rest/v1/"+path,{...options,headers:{...headers,...options.headers}},"Supabase");
 }
+function decodeHtml(s){
+ return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
+}
+function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\\s+/g," ").trim();}
 async function search(q){
- const u=new URL("https://www.googleapis.com/customsearch/v1");
- u.searchParams.set("key",GOOGLE_API_KEY);u.searchParams.set("cx",GOOGLE_CX);u.searchParams.set("q",q);u.searchParams.set("num","10");
- const data=await request(u,{},"Google Custom Search");return data.items||[];
+ const u=new URL("https://www.bing.com/search");
+ u.searchParams.set("format","rss");u.searchParams.set("q",q);u.searchParams.set("count","10");
+ try{
+  const res=await fetch(u,{headers:{"Accept":"application/rss+xml, application/xml;q=0.9, */*;q=0.8","User-Agent":"Mozilla/5.0 ArtistFrequencyOpportunityResearch/1.2"},signal:AbortSignal.timeout(15000)});
+  const xml=await res.text();
+  if(!res.ok)throw new Error("Bing RSS "+res.status+": "+xml.slice(0,240));
+  const items=[...xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)].map(m=>{
+   const field=(tag)=>{const x=m[1].match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)<\\/"+tag+">","i"));return x?stripTags(x[1]):"";};
+   return {title:field("title"),link:field("link"),snippet:field("description")};
+  }).filter(x=>/^https?:\\/\\//i.test(x.link));
+  if(items.length)return items;
+  throw new Error("Bing RSS returned no parseable results");
+ }catch(bingError){
+  const ddg=new URL("https://html.duckduckgo.com/html/");
+  ddg.searchParams.set("q",q);
+  const res=await fetch(ddg,{headers:{"User-Agent":"Mozilla/5.0 (compatible; ArtistFrequencyOpportunityResearch/1.2)","Accept":"text/html"},signal:AbortSignal.timeout(15000)});
+  const html=await res.text();
+  if(!res.ok)throw new Error("Bing failed ("+bingError.message+"); DuckDuckGo HTML "+res.status);
+  const items=[...html.matchAll(/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi)].map(m=>{
+   let link=decodeHtml(m[1]);try{const parsed=new URL(link);if(parsed.hostname.includes("duckduckgo.com")&&parsed.searchParams.has("uddg"))link=parsed.searchParams.get("uddg");}catch{}
+   const snippetMatch=html.slice(m.index,m.index+3500).match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i);
+   return {title:stripTags(m[2]),link,snippet:snippetMatch?stripTags(snippetMatch[1]):""};
+  }).filter(x=>/^https?:\\/\\//i.test(x.link));
+  if(!items.length)throw new Error("Bing failed ("+bingError.message+"); DuckDuckGo returned no parseable results");
+  return items;
+ }
 }
 async function inspect(url){
  try{
@@ -90,7 +115,7 @@ async function main(){
      genres:[],website_url:ev.spotifyUrl||finalUrl,submission_url:finalUrl,contact_email:email,
      submission_method:email||/mailto:/i.test(html)?"email":"form",
      accepts_free_submissions:/free (submission|to submit|music submissions)|no fee|always free/i.test(html+" "+(hit.snippet||"")),
-     activity_status:"active",source_name:"Google Programmable Search Engine",source_url:url,
+     activity_status:"active",source_name:"Public Web Search (Bing RSS / DuckDuckGo)",source_url:url,
      evidence_url:finalUrl,first_seen_at:now(),last_checked_at:now(),review_status:"pending"};
     await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(candidate)});
     queued++;
