@@ -1,4 +1,4 @@
--- Google Search research batch captured 10 November 2026.
+-- Public web-search research batch captured 10 November 2026.
 -- All entries are PRIVATE pending candidates; no public directory rows or
 -- delivery permissions are created by this migration.
 BEGIN;
