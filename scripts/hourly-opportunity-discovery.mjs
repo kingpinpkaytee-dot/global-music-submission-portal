@@ -85,7 +85,10 @@ function rssItems(xml){
   const field=(tag)=>{const x=block.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));return x?stripTags(x[1].replace(/^<!\[CDATA\[|\]\]>$/g,"")):"";};
   let link=field("link");
   if(!link){const x=block.match(/<link\b[^>]*href=["']([^"']+)["']/i);if(x)link=decodeHtml(x[1]);}
-  return {title:field("title"),link,snippet:field("description")||field("summary")};
+  const sourceTag=block.match(/<source\b([^>]*)>([\s\S]*?)<\/source>/i);
+  const sourceAttr=sourceTag?.[1]?.match(/url=["']([^"']+)["']/i);
+  const publisherUrl=sourceAttr?decodeHtml(sourceAttr[1]):null;
+  return {title:field("title"),link,snippet:field("description")||field("summary"),publisherUrl};
  }).filter(x=>/^https?:\/\//i.test(x.link));
 }
 async function fetchFeed(url,label){
@@ -133,7 +136,7 @@ async function search(q){
    let link=hit.link;
    // Resolve common Bing redirect wrappers before inspecting the destination.
    try{const p=new URL(link);if(p.hostname.endsWith("bing.com")&&p.searchParams.has("url"))link=p.searchParams.get("url");}catch{}
-   bucket.push({...hit,link,provider:name});
+   bucket.push({...hit,link,provider:name,publisherUrl:hit.publisherUrl||null});
   }
   buckets.push(bucket);
  }
@@ -188,6 +191,34 @@ function extractDspPlaylist(html,url,snippet){
  for(const link of links){const found=detectDspPlaylistUrl(link);if(found)return found;}
  return null;
 }
+function extractCuratorProfileLinks(html,baseUrl){
+ const links=new Set();let base;try{base=new URL(baseUrl);}catch{return [];}
+ const raw=String(html||"");
+ const hrefs=[...raw.matchAll(/(?:href|content|data-url)\s*=\s*["']([^"']+)["']/gi)].map(m=>decodeHtml(m[1]));
+ const embedded=[...raw.matchAll(/https?:\/\/[^\s"'<>]+/gi)].map(m=>decodeHtml(m[0]));
+ for(const value of [...hrefs,...embedded]){
+  try{
+   const u=new URL(value,base);
+   if(!/^https?:$/.test(u.protocol))continue;
+   if(u.hostname.toLowerCase().replace(/^www\./,"")!==base.hostname.toLowerCase().replace(/^www\./,""))continue;
+   if(/\.(?:png|jpe?g|gif|svg|webp|css|js|pdf)(?:$|\?)/i.test(u.pathname))continue;
+   if(!/(curator|profile|playlist|playlists|submit|artist|user)/i.test(u.pathname))continue;
+   u.hash="";links.add(u.toString());
+  }catch{}
+  if(links.size>=8)break;
+ }
+ return [...links].slice(0,8);
+}
+async function inspectCuratorProfileEvidence(html,baseUrl){
+ const direct=extractDspPlaylist(html,baseUrl,"");
+ if(direct)return {html:"",profileUrl:baseUrl,playlist:direct};
+ for(const profileUrl of extractCuratorProfileLinks(html,baseUrl)){
+  const page=await inspect(profileUrl);if(!page.ok)continue;
+  const playlist=extractDspPlaylist(page.html||"",page.finalUrl||profileUrl,"");
+  if(playlist)return {html:page.html||"",profileUrl:page.finalUrl||profileUrl,playlist};
+ }
+ return {html:"",profileUrl:null,playlist:null};
+}
 function parseCount(raw){
  const value=String(raw||"").replace(/,/g,"").replace(/\s/gi,"").toLowerCase();
  const n=parseFloat(value);
@@ -240,44 +271,34 @@ function hostnameOf(value){
  try{return new URL(value).hostname.toLowerCase().replace(/^www\./,"");}catch{return "";}
 }
 async function resolveGoogleNewsPublisher(hit){
- const title=cleanName(hit.title);
- if(!title)return null;
- // Google News RSS sometimes returns opaque article wrappers. Search the exact
- // headline on Bing and accept only an inspected external page whose content
- // independently contains multiple meaningful headline terms.
- try{
-  const u=new URL("https://www.bing.com/search");
-  u.searchParams.set("format","rss");
-  u.searchParams.set("q",'"'+title.replace(/["']/g," ")+'"');
-  u.searchParams.set("count","10");
-  const results=await fetchFeed(u,"Bing exact-headline resolution");
-  const terms=title.toLowerCase().split(/\s+/).filter(x=>x.length>3).slice(0,6);
-  for(const item of results.slice(0,8)){
-   let candidate=item.link;
-   try{
-    const parsed=new URL(candidate);
-    if(parsed.hostname==="news.google.com"||parsed.hostname.endsWith(".news.google.com")||parsed.hostname.endsWith("bing.com"))continue;
-   }catch{continue;}
-   const overlap=terms.filter(t=>(item.title||"").toLowerCase().includes(t)).length;
-   if(overlap<Math.min(2,terms.length))continue;
-   const page=await inspect(candidate);
-   if(!page.ok)continue;
-   const body=stripTags(page.html||"").toLowerCase();
-   const pageOverlap=terms.filter(t=>body.includes(t)).length;
-   if(pageOverlap>=Math.min(2,terms.length))return page.finalUrl||candidate;
-  }
- }catch{}
- // Last attempt: follow the Google News redirect and inspect canonical metadata.
+ const title=cleanName(hit.title);if(!title)return null;
+ const publisherHost=hostnameOf(hit.publisherUrl);
+ const terms=title.toLowerCase().split(/\s+/).filter(x=>x.length>3).slice(0,6);
+ for(const scoped of [true,false]){
+  try{
+   const u=new URL("https://www.bing.com/search");u.searchParams.set("format","rss");
+   u.searchParams.set("q",'"'+title.replace(/["']/g," ")+'"'+(scoped&&publisherHost?' site:'+publisherHost:""));
+   u.searchParams.set("count","10");
+   const results=await fetchFeed(u,scoped?"Bing publisher-headline resolution":"Bing exact-headline resolution");
+   for(const item of results.slice(0,10)){
+    const candidate=item.link;let parsed;try{parsed=new URL(candidate);}catch{continue;}
+    const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
+    if(host==="news.google.com"||host.endsWith(".news.google.com")||host==="bing.com"||host.endsWith(".bing.com"))continue;
+    if(scoped&&publisherHost&&host!==publisherHost)continue;
+    const overlap=terms.filter(t=>(item.title||"").toLowerCase().includes(t)).length;
+    if(overlap<Math.min(2,terms.length))continue;
+    const page=await inspect(candidate);if(!page.ok)continue;
+    const body=stripTags(page.html||"").toLowerCase();
+    if(terms.filter(t=>body.includes(t)).length>=Math.min(2,terms.length))return page.finalUrl||candidate;
+   }
+  }catch{}
+ }
  try{
   const page=await inspect(hit.link);
   if(page.ok){
    const html=String(page.html||"");
-   const canonical=html.match(/<link[^>]+rel=["'](?:canonical|alternate)["'][^>]+href=["']([^"']+)["']/i)
-    ||html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
-   if(canonical){
-    const target=new URL(decodeHtml(canonical[1]),page.finalUrl||hit.link);
-    if(!/(^|\\.)news\\.google\\.com$/i.test(target.hostname))return target.toString();
-   }
+   const canonical=html.match(/<link[^>]+rel=["'](?:canonical|alternate)["'][^>]+href=["']([^"']+)["']/i)||html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
+   if(canonical){const target=new URL(decodeHtml(canonical[1]),page.finalUrl||hit.link);if(!/(^|\.)news\.google\.com$/i.test(target.hostname))return target.toString();}
   }
  }catch{}
  return null;
@@ -359,7 +380,11 @@ async function main(){
      let finalHost="";try{finalHost=new URL(page.finalUrl||url).hostname.toLowerCase();}catch{}
      if(finalHost==="news.google.com"||finalHost.endsWith(".news.google.com"))page={ok:false,reason:"Google News wrapper did not expose a publisher destination"};
     }
-    const ev=evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url);
+    const profileEvidence=item.category==="playlist"&&page.ok
+      ? await inspectCuratorProfileEvidence(page.html||"",page.finalUrl||url)
+      : {html:"",profileUrl:null,playlist:null};
+    const metricHtml=(profileEvidence.html||"")+" "+(page.html||"");
+    const ev=evidence(item.category,hit.title||"",hit.snippet||"",metricHtml,page.finalUrl||url);
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
     const corroboration=ev.ok?await findIndependentCorroboration(item.category,name,finalUrl,ev.playlistUrl||null,ev.dspName||item.dsp||null):{ok:false,reason:"Primary publisher-page checks did not pass"};
@@ -389,11 +414,11 @@ async function main(){
     const lowerText=(name+" "+(hit.snippet||"")+" "+html.slice(0,50000)).toLowerCase();
     const knownGenres=["Amapiano","Afro House","Afrobeats","Afrobeat","Deep House","Melodic House","Organic House","Hip Hop","Rap","R&B","Soul","Funk","Jazz","Blues","Rock","Alternative","Indie","Pop","Dance","EDM","House","Tech House","Progressive House","Techno","Trance","Drum and Bass","Dubstep","Garage","Disco","Reggae","Dancehall","Gospel","Christian","Classical","Country","Folk","Metal","Punk","Latin","Reggaeton","K-Pop","J-Pop","Ambient","Downtempo","Chillout","World Music"];
     const extractedGenres=knownGenres.filter(g=>lowerText.includes(g.toLowerCase()));
-    const metrics=extractPlaylistMetrics(html+" "+(hit.snippet||"")+" "+name);
+    const metrics=extractPlaylistMetrics(metricHtml+" "+(hit.snippet||"")+" "+name);
     const followerCount=metrics.followerCount;
     const responseRate=metrics.responseRate;
     const activityStatus=metrics.activityStatus;
-    const playlistData=ev.playlistUrl?(" | DSP playlist: "+ev.dspName+" "+ev.playlistUrl):"";
+    const playlistData=ev.playlistUrl?(" | DSP playlist: "+ev.dspName+" "+ev.playlistUrl+" | Curator profile: "+(profileEvidence.profileUrl||"source page")):"";
     const failedCriteria=[];
     if(!ev.playlistUrl)failedCriteria.push("no individual public DSP playlist URL");
     if(followerCount===null||followerCount<=100)failedCriteria.push("follower count must be greater than 100");
