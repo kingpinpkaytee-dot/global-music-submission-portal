@@ -675,6 +675,20 @@ async function loadAdminCandidates() {
   renderAdminCandidates();
 }
 
+async function publishAllPendingCandidates() {
+  if (currentRole !== "admin") throw new Error("Administrator access is required.");
+  const { data, error } = await supabase.rpc("admin_publish_all_pending_opportunity_candidates");
+  if (error) throw error;
+  const result = data || {};
+  const published = Number(result.published || 0);
+  const duplicates = Number(result.duplicates || 0);
+  const skipped = Number(result.skipped || 0);
+  setMessage("candidateReviewResult",
+    "Bulk publication complete: " + published + " published, " + duplicates +
+    " matched existing listings, " + skipped + " left pending because source evidence or a submission route needs attention. All published listings remain external-only; in-platform delivery is disabled.");
+  await Promise.all([loadAdminCandidates(), loadAdminDirectory(), loadDirectory()]);
+}
+
 async function reviewAdminCandidate(id, decision) {
   if (currentRole !== "admin") throw new Error("Administrator access is required.");
   const { data, error } = await supabase.rpc("admin_review_opportunity_candidate", {
@@ -922,6 +936,21 @@ document.getElementById("filters")?.addEventListener("click", event => {
 });
 byId("submissionType")?.addEventListener("change", populateSubmissionTargets);
 
+byId("publishAllCandidates")?.addEventListener("click", async event => {
+  const button = event.currentTarget;
+  if (currentRole !== "admin") {
+    setMessage("candidateReviewResult", "Administrator access is required.", true);
+    return;
+  }
+  button.disabled = true;
+  try {
+    await publishAllPendingCandidates();
+  } catch (error) {
+    setMessage("candidateReviewResult", error?.message || "Bulk candidate publication failed.", true);
+  } finally {
+    button.disabled = false;
+  }
+});
 byId("candidateReviewList")?.addEventListener("click", async event => {
   const button = event.target.closest("button[data-candidate-review][data-candidate-id]");
   if (!button) return;
