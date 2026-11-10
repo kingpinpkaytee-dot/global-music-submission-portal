@@ -179,7 +179,8 @@ async function updateOpportunityStats() {
     publicRadio: "radio_station",
     publicBloggers: "blogger",
     publicPlatforms: "platform",
-    publicWebsites: "website"
+    publicWebsites: "website",
+    publicContacts: "contact"
   };
   const baseCount = () => supabase.from("opportunity_directories")
     .select("id", { count: "exact", head: true })
