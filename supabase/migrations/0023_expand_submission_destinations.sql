@@ -29,7 +29,7 @@ RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $$$
 DECLARE
   current_artist uuid := auth.uid();
   current_role text;
@@ -141,7 +141,7 @@ RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE saved_id uuid;
 BEGIN
   IF NOT public.is_site_admin() THEN RAISE EXCEPTION 'Admin access required'; END IF;
@@ -197,7 +197,7 @@ BEGIN
   END IF;
   RETURN saved_id;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.admin_upsert_opportunity_directory(
   text,text,text,text,text,text,text[],boolean,boolean,boolean,text,uuid
