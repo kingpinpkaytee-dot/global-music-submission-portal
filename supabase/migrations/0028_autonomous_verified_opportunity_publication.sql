@@ -39,12 +39,12 @@ BEGIN
   evidence := candidate.auto_verification;
   IF evidence IS NULL
      OR coalesce((evidence->>'score')::integer,0) < 95
-     OR evidence->>'schema_version' <> '1'
-     OR evidence->>'reachable' <> 'true'
-     OR evidence->>'direct_page_evidence' <> 'true'
-     OR evidence->>'submission_route_found' <> 'true'
-     OR evidence->>'category_match' <> 'true'
-     OR evidence->>'canonical_destination' <> 'true'
+     OR evidence->>'schema_version' IS DISTINCT FROM '1'
+     OR evidence->>'reachable' IS DISTINCT FROM 'true'
+     OR evidence->>'direct_page_evidence' IS DISTINCT FROM 'true'
+     OR evidence->>'submission_route_found' IS DISTINCT FROM 'true'
+     OR evidence->>'category_match' IS DISTINCT FROM 'true'
+     OR evidence->>'canonical_destination' IS DISTINCT FROM 'true'
      OR candidate.auto_verified_at IS NULL
      OR candidate.auto_verified_at < now() - interval '24 hours'
      OR candidate.source_url IS NULL
