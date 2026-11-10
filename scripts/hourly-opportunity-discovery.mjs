@@ -10,11 +10,16 @@ const isNewSecretKey=SERVICE_ROLE_KEY.startsWith("sb_secret_");
 if(SERVICE_ROLE_KEY.startsWith("sb_publishable_")||SERVICE_ROLE_KEY.startsWith("sb_anon_")) throw new Error("SUPABASE_SERVICE_ROLE_KEY must be a server-side Supabase secret key (sb_secret_*) or legacy service_role JWT, not a publishable/anon key.");
 if(!isNewSecretKey&&SERVICE_ROLE_KEY.split(".").length!==3) throw new Error("SUPABASE_SERVICE_ROLE_KEY must be an sb_secret_* key or a legacy three-part service_role JWT.");
 const headers={apikey:SERVICE_ROLE_KEY,...(isNewSecretKey?{}:{Authorization:"Bearer "+SERVICE_ROLE_KEY}),"Content-Type":"application/json"};
+// Narrow, submission-intent queries reduce generic streaming-directory noise.
 const queries=[
- {category:"playlist",q:'Spotify playlist "submit your track" OR "submit music" free curator'},
- {category:"radio_station",q:'radio station "music submissions" OR "submit your music" independent artists'},
- {category:"blogger",q:'music blog OR music magazine "submit music" OR "send us music"'},
- {category:"curator",q:'Spotify playlist curator "submit track" OR "music submission" open'}
+ {category:"playlist",q:'"submit your Spotify playlist" OR "submit your track" playlist curator free'},
+ {category:"playlist",q:'"playlist submission" "Spotify playlist" independent curator submit music'},
+ {category:"radio_station",q:'"music submissions" "radio station" OR "submit your music" radio'},
+ {category:"radio_station",q:'radio station "submit music" artist submissions demo form'},
+ {category:"blogger",q:'music blog "submit music" OR "send us your music" submissions'},
+ {category:"blogger",q:'music magazine editorial "music submissions" independent artists review'},
+ {category:"curator",q:'"playlist curator" "submit music" OR "submit a track" Spotify'},
+ {category:"curator",q:'independent Spotify playlist curator submissions Afro House Amapiano Deep House'}
 ];
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
@@ -50,32 +55,60 @@ async function fetchFeed(url,label){
  throw new Error(label+" returned no parseable results (type="+(res.headers.get("content-type")||"unknown")+", bytes="+body.length+", preview="+body.slice(0,100).replace(/\s+/g," ")+")");
 }
 async function search(q){
- const failures=[];
- const bing=new URL("https://www.bing.com/search");
- bing.searchParams.set("format","rss");bing.searchParams.set("q",q);bing.searchParams.set("count","20");
- try{return await fetchFeed(bing,"Bing RSS");}catch(e){failures.push(e.message);}
- const googleNews=new URL("https://news.google.com/rss/search");
- googleNews.searchParams.set("q",q);googleNews.searchParams.set("hl","en-US");googleNews.searchParams.set("gl","US");googleNews.searchParams.set("ceid","US:en");
- try{return await fetchFeed(googleNews,"Google News RSS");}catch(e){failures.push(e.message);}
- try{
-  const ddg=new URL("https://html.duckduckgo.com/html/");
-  ddg.searchParams.set("q",q);
-  const res=await fetch(ddg,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
-  const html=await res.text();
-  if(!res.ok)throw new Error("DuckDuckGo HTML HTTP "+res.status+": "+html.slice(0,160));
-  const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
-  const items=anchors.map(m=>{
-   const href=m[1].match(/href=["']([^"']+)["']/i);
-   let link=href?decodeHtml(href[1]):"";
-   try{const parsed=new URL(link);if(parsed.hostname.includes("duckduckgo.com")&&parsed.searchParams.has("uddg"))link=parsed.searchParams.get("uddg");}catch{}
-   const near=html.slice(m.index,m.index+5000);
-   const snip=near.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
-   return {title:stripTags(m[2]),link,snippet:snip?stripTags(snip[1]):""};
-  }).filter(x=>/^https?:\/\//i.test(x.link));
-  if(items.length)return items;
-  throw new Error("DuckDuckGo returned no result anchors (type="+(res.headers.get("content-type")||"unknown")+", bytes="+html.length+", preview="+html.slice(0,100).replace(/\s+/g," ")+")");
- }catch(e){failures.push(e.message);}
- throw new Error(failures.join("; "));
+ const providers=[
+  {name:"Bing RSS",run:async()=>{
+   const u=new URL("https://www.bing.com/search");
+   u.searchParams.set("format","rss");u.searchParams.set("q",q);u.searchParams.set("count","20");
+   return fetchFeed(u,"Bing RSS");
+  }},
+  {name:"Google News RSS",run:async()=>{
+   const u=new URL("https://news.google.com/rss/search");
+   u.searchParams.set("q",q);u.searchParams.set("hl","en-ZA");u.searchParams.set("gl","ZA");u.searchParams.set("ceid","ZA:en");
+   return fetchFeed(u,"Google News RSS");
+  }},
+  {name:"DuckDuckGo HTML",run:async()=>{
+   const u=new URL("https://html.duckduckgo.com/html/");u.searchParams.set("q",q);
+   const res=await fetch(u,{headers:{"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36","Accept":"text/html,application/xhtml+xml"},signal:AbortSignal.timeout(18000)});
+   const html=await res.text();
+   if(!res.ok)throw new Error("DuckDuckGo HTML HTTP "+res.status+": "+html.slice(0,160));
+   const anchors=[...html.matchAll(/<a\\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\\s\\S]*?)<\\/a>/gi)];
+   const items=anchors.map(m=>{
+    const href=m[1].match(/href=["']([^"']+)["']/i);let link=href?decodeHtml(href[1]):"";
+    try{const p=new URL(link);if(p.hostname.includes("duckduckgo.com")&&p.searchParams.has("uddg"))link=p.searchParams.get("uddg");}catch{}
+    const near=html.slice(m.index,m.index+5000),snip=near.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i);
+    return {title:stripTags(m[2]),link,snippet:snip?stripTags(snip[1]):""};
+   }).filter(x=>/^https?:\\/\\//i.test(x.link));
+   if(!items.length)throw new Error("DuckDuckGo returned no result anchors (bytes="+html.length+")");
+   return items;
+  }}
+ ];
+ const results=await Promise.allSettled(providers.map(async p=>({provider:p.name,items:await p.run()})));
+ const merged=[],stats={};
+ for(let i=0;i<results.length;i++){
+  const r=results[i],name=providers[i].name;
+  if(r.status!=="fulfilled"){stats[name]={count:0,error:String(r.reason?.message||r.reason).slice(0,300)};continue;}
+  const items=r.value.items.slice(0,12);
+  stats[name]={count:items.length,error:null};
+  for(const hit of items){
+   let link=hit.link;
+   // Resolve common search-engine redirect wrappers before inspection/deduplication.
+   try{
+    const p=new URL(link);
+    if(p.hostname.endsWith("bing.com")&&p.searchParams.has("url"))link=decodeURIComponent(p.searchParams.get("url"));
+    else if(p.hostname==="news.google.com"&&p.pathname.includes("/articles/"))link=link;
+   }catch{}
+   merged.push({...hit,link,provider:name});
+  }
+ }
+ const seen=new Set(),unique=[];
+ for(const hit of merged){
+  try{
+   const u=new URL(hit.link);u.hash="";u.search="";
+   const key=u.toString().replace(/\\/$/,"").toLowerCase();
+   if(seen.has(key))continue;seen.add(key);unique.push(hit);
+  }catch{}
+ }
+ return {items:unique.slice(0,12),providerStats:stats};
 }
 async function inspect(url){
  try{
@@ -109,11 +142,21 @@ function evidence(category,title,snippet,html,url){
 }
 async function main(){
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of queries){
   try{
-   const hits=await search(item.q);done++;
-   for(const hit of hits){
+   const searchResult=await search(item.q);done++;
+   for(const [provider,stats] of Object.entries(searchResult.providerStats||{})){
+    providerStats[provider]??={queries:0,results:0,failures:0};
+    providerStats[provider].queries++;providerStats[provider].results+=stats.count||0;
+    if(stats.error)providerStats[provider].failures++;
+   }
+   for(const hit of searchResult.items){
+    const categoryKey=item.category+"|"+hit.link.toLowerCase();
+    if(categorySeen.has(categoryKey))continue;
+    categorySeen.add(categoryKey);
+    processedByCategory[item.category]=(processedByCategory[item.category]||0)+1;
+    if(processedByCategory[item.category]>12)continue;
     seen++;const url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
     const page=await inspect(url);
@@ -135,7 +178,7 @@ async function main(){
      blogger:submissionEvidence&&/(music blog|blog|magazine|editorial|music review)/i.test(searchable)
     }[item.category]===true;
     if(!categoryRelevant){
-     rejectedDetails.push({category:item.category,name,url:finalUrl,evidenceReason:ev.reason||"Evidence passed but category relevance check failed",spotifyDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
+     rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",spotifyDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
      await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
       method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
       body:JSON.stringify({run_id:runId,category:item.category,name,destination_url:finalUrl,
@@ -162,7 +205,7 @@ async function main(){
      activity_status:"unknown",source_name:"Public Web Search (Bing RSS / Google News RSS / DuckDuckGo)",
      source_url:url,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending"};
     await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(candidate)});
-    queued++;queuedDetails.push({category:item.category,name,source_url:url,submission_url:candidate.submission_url,contact_email:email});
+    queued++;queuedDetails.push({category:item.category,name,source_url:url,submission_url:candidate.submission_url,contact_email:email,provider:hit.provider||"unknown"});
    }
   }catch(e){errors.push(item.category+": "+e.message);}
  }
@@ -170,7 +213,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:0,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
