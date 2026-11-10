@@ -83,32 +83,36 @@ async function search(q){
   }}
  ];
  const results=await Promise.allSettled(providers.map(async p=>({provider:p.name,items:await p.run()})));
- const merged=[],stats={};
+ const buckets=[],stats={};
  for(let i=0;i<results.length;i++){
   const r=results[i],name=providers[i].name;
   if(r.status!=="fulfilled"){stats[name]={count:0,error:String(r.reason?.message||r.reason).slice(0,300)};continue;}
   const items=r.value.items.slice(0,12);
   stats[name]={count:items.length,error:null};
+  const bucket=[];
   for(const hit of items){
    let link=hit.link;
-   // Resolve common search-engine redirect wrappers before inspection/deduplication.
-   try{
-    const p=new URL(link);
-    if(p.hostname.endsWith("bing.com")&&p.searchParams.has("url"))link=decodeURIComponent(p.searchParams.get("url"));
-    else if(p.hostname==="news.google.com"&&p.pathname.includes("/articles/"))link=link;
-   }catch{}
-   merged.push({...hit,link,provider:name});
+   // Resolve common Bing redirect wrappers before inspecting the destination.
+   try{const p=new URL(link);if(p.hostname.endsWith("bing.com")&&p.searchParams.has("url"))link=p.searchParams.get("url");}catch{}
+   bucket.push({...hit,link,provider:name});
   }
+  buckets.push(bucket);
  }
- const seen=new Set(),unique=[];
- for(const hit of merged){
-  try{
-   const u=new URL(hit.link);u.hash="";u.search="";
-   const key=u.toString().replace(/\/$/,"").toLowerCase();
-   if(seen.has(key))continue;seen.add(key);unique.push(hit);
-  }catch{}
+ // Round-robin providers so the first engine cannot crowd out the others.
+ const unique=[],seen=new Set();
+ for(let index=0;index<12;index++){
+  for(const bucket of buckets){
+   const hit=bucket[index];if(!hit)continue;
+   try{
+    const u=new URL(hit.link);u.hash="";u.search="";
+    const key=u.toString().replace(/\/$/,"").toLowerCase();
+    if(seen.has(key))continue;seen.add(key);unique.push(hit);
+   }catch{}
+   if(unique.length>=12)break;
+  }
+  if(unique.length>=12)break;
  }
- return {items:unique.slice(0,12),providerStats:stats};
+ return {items:unique,providerStats:stats};
 }
 async function inspect(url){
  try{
