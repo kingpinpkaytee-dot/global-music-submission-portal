@@ -20,7 +20,7 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 
 ## Production status — 9 November 2026
 
-The Supabase production project is linked. Migrations **0001–0015** were previously confirmed applied; later discovery, payment and opportunity batches **0016–0024** are committed in the repository and must be checked against the production migration history before applying any missing migrations, in numeric order.
+The Supabase production project is linked. Migrations **0001–0015** were previously confirmed applied; later discovery, payment and opportunity batches **0016–0025** are committed in the repository and must be checked against the production migration history before applying any missing migrations, in numeric order.
 
 - **11/11 public tables have RLS enabled.**
 - **21 RLS policies** are installed.
@@ -80,6 +80,7 @@ The frontend has passed JavaScript ES-module syntax checks and a static DOM-bind
 - `supabase/migrations/0022_hourly_opportunity_discovery.sql` — hourly discovery audit trail.
 - `supabase/migrations/0023_expand_submission_destinations.sql` — curator, promotion-platform and industry-contact categories, plus protected submission eligibility checks.
 - `supabase/migrations/0024_google_search_submission_candidates.sql` — Google Search research candidates for admin review; no automatic public publication.
+- `supabase/migrations/0025_admin_candidate_review.sql` — protected admin-only approval/rejection RPC; accepted listings are public but remain non-integrated.
 - `src/supabase-client.js` — one shared Supabase client and safe public-key configuration check.
 - `src/auth.js` — email/password, Google OAuth, session handling and sign-out.
 - `src/app.js` — live public data, artist dashboard, submissions, campaigns, Marketplace and admin moderation integration.
@@ -119,4 +120,4 @@ See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md`, `
 
 The website's Google Programmable Search Element remains a user-facing search box. The hourly worker uses Google's Custom Search JSON API only if the Google Cloud project is entitled to that legacy API. Google closed Custom Search JSON API access to new customers on 20 January 2026 and has announced retirement on 1 January 2027. An API key and Search Engine ID alone do not prove entitlement. If the worker receives 403 access-denied responses, the project must use an eligible Google-supported alternative; do not scrape Google result pages or claim automated search is running.
 
-The discovery worker now queues candidates for admin review only. It does not insert or update public directory records, does not set verified/public flags, and never enables in-platform submissions. Migration 0024 stages 24 source-backed research candidates found through Google Search; they remain pending until a human checks their current submission route, terms, recipient and genre fit. Contact emails and external forms are displayed as information only until a real, tested delivery adapter is configured.
+The discovery worker now queues candidates for admin review only. It performs four searches per hourly run (96 per day at the configured schedule), within Google's documented 100-query daily free allowance for eligible legacy API customers. It does not insert or update public directory records, does not set verified/public flags, and never enables in-platform submissions. Migration 0024 stages 24 source-backed research candidates found through Google Search; they remain pending until a human checks their current submission route, terms, recipient and genre fit. Contact emails and external forms are displayed as information only until a real, tested delivery adapter is configured.
