@@ -10,16 +10,16 @@ const isNewSecretKey=SERVICE_ROLE_KEY.startsWith("sb_secret_");
 if(SERVICE_ROLE_KEY.startsWith("sb_publishable_")||SERVICE_ROLE_KEY.startsWith("sb_anon_")) throw new Error("SUPABASE_SERVICE_ROLE_KEY must be a server-side Supabase secret key (sb_secret_*) or legacy service_role JWT, not a publishable/anon key.");
 if(!isNewSecretKey&&SERVICE_ROLE_KEY.split(".").length!==3) throw new Error("SUPABASE_SERVICE_ROLE_KEY must be an sb_secret_* key or a legacy three-part service_role JWT.");
 const headers={apikey:SERVICE_ROLE_KEY,...(isNewSecretKey?{}:{Authorization:"Bearer "+SERVICE_ROLE_KEY}),"Content-Type":"application/json"};
-// Narrow, submission-intent queries reduce generic streaming-directory noise.
+// Exact-phrase searches avoid dictionary matches on the word "submit".
 const queries=[
- {category:"playlist",q:'"submit your Spotify playlist" OR "submit your track" playlist curator free'},
- {category:"playlist",q:'"playlist submission" "Spotify playlist" independent curator submit music'},
- {category:"radio_station",q:'"music submissions" "radio station" OR "submit your music" radio'},
- {category:"radio_station",q:'radio station "submit music" artist submissions demo form'},
- {category:"blogger",q:'music blog "submit music" OR "send us your music" submissions'},
- {category:"blogger",q:'music magazine editorial "music submissions" independent artists review'},
- {category:"curator",q:'"playlist curator" "submit music" OR "submit a track" Spotify'},
- {category:"curator",q:'independent Spotify playlist curator submissions Afro House Amapiano Deep House'}
+ {category:"playlist",q:'"submit your Spotify playlist" curator -definition -dictionary -lyrics'},
+ {category:"playlist",q:'"Spotify playlist submission" "submit music" curator -definition -lyrics'},
+ {category:"radio_station",q:'"radio music submissions" station artists -jobs -definition'},
+ {category:"radio_station",q:'"submit music to" "radio station" artist submission form -definition'},
+ {category:"blogger",q:'"submit music" "music blog" independent artists -definition -lyrics'},
+ {category:"blogger",q:'"send us your music" blog editorial submissions -jobs'},
+ {category:"curator",q:'"playlist curator" "submit your track" Spotify -definition -lyrics'},
+ {category:"curator",q:'"submit music to our playlist" Spotify curator -definition'}
 ];
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
@@ -86,7 +86,7 @@ async function search(q){
  const buckets=[],stats={};
  for(let i=0;i<results.length;i++){
   const r=results[i],name=providers[i].name;
-  if(r.status!=="fulfilled"){stats[name]={count:0,error:String(r.reason?.message||r.reason).slice(0,300)};continue;}
+  if(r.status!=="fulfilled"){stats[name]={count:0,error:String(r.reason?.message||r.reason).slice(0,500)};continue;}
   const items=r.value.items.slice(0,12);
   stats[name]={count:items.length,error:null};
   const bucket=[];
@@ -163,6 +163,14 @@ async function main(){
     if(processedByCategory[item.category]>12)continue;
     seen++;const url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
+    // Google News RSS article wrappers are discovery references, not destination pages.
+    // Do not mistake a Google News wrapper for a verified publisher submission route.
+    let urlHost="";
+    try{urlHost=new URL(url).hostname.toLowerCase();}catch{}
+    if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com")){
+     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url,provider:hit.provider||"Google News RSS",evidenceReason:"Google News article wrapper; publisher destination not resolved",searchSnippet:(hit.snippet||"").slice(0,350)});
+     rejected++;continue;
+    }
     const page=await inspect(url);
     const ev=page.ok?evidence(item.category,hit.title||"",hit.snippet||"",page.html||"",page.finalUrl||url):{ok:false,reason:page.reason||"Destination could not be inspected; manual review required"};
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
