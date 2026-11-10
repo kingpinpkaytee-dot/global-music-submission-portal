@@ -121,11 +121,18 @@ async function main(){
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
     const searchable=(name+" "+(hit.snippet||"")+" "+(page.html||"").slice(0,30000)).toLowerCase();
+    let host="",path="";
+    try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\\./,"");path=parsed.pathname.toLowerCase();}catch{}
+    const genericRadioDirectories=["iheart.com","accuradio.com","radio.net","mytuner-radio.com","appradiofm.com","tunein.com","radio.garden"];
+    const genericRadioLanding=genericRadioDirectories.some(domain=>host===domain||host.endsWith("."+domain))&&
+      (path==="/"||/^\\/(live|radio|home|stations?)\\/?$/.test(path));
+    const spotifyDestination=host==="spotify.com"||host.endsWith(".spotify.com")||host==="spotify.link"||host.endsWith(".spotify.link");
+    const submissionEvidence=ev.ok===true;
     const categoryRelevant={
-     playlist:/(spotify|playlist|curator|submit|music)/i.test(searchable),
-     curator:/(spotify|playlist|curator|submit|music)/i.test(searchable),
-     radio_station:/(radio|broadcast|fm|station|submit|music)/i.test(searchable),
-     blogger:/(music blog|blog|magazine|editorial|music review|submit|artist|demo)/i.test(searchable)
+     playlist:!spotifyDestination&&submissionEvidence&&!!ev.spotifyUrl&&/(playlist|curator|submit)/i.test(searchable),
+     curator:!spotifyDestination&&submissionEvidence&&/(playlist curator|curator|submit.*playlist|playlist.*submit)/i.test(searchable),
+     radio_station:!genericRadioLanding&&submissionEvidence&&/(radio|broadcast|fm|station)/i.test(searchable),
+     blogger:submissionEvidence&&/(music blog|blog|magazine|editorial|music review)/i.test(searchable)
     }[item.category]===true;
     if(!categoryRelevant){
      await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
