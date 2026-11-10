@@ -109,7 +109,7 @@ function evidence(category,title,snippet,html,url){
 }
 async function main(){
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const errors=[];
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const duplicateDetails=[];const errors=[];
  for(const item of queries){
   try{
    const hits=await search(item.q);done++;
@@ -144,8 +144,8 @@ async function main(){
       verification_status:"pending",
       verification_reason:ev.ok?"Automatic checks passed; administrator review required":ev.reason+"; retained for administrator review"})
     });
-    const existing=await rest("opportunity_discovery_candidates?select=id&category=eq."+encodeURIComponent(item.category)+"&source_url=eq."+encodeURIComponent(url)+"&limit=1");
-    if(existing&&existing.length){duplicates++;continue;}
+    const existing=await rest("opportunity_discovery_candidates?select=id,name,category,source_url,website_url,submission_url,review_status,activity_status&category=eq."+encodeURIComponent(item.category)+"&source_url=eq."+encodeURIComponent(url)+"&limit=1");
+    if(existing&&existing.length){duplicates++;duplicateDetails.push(existing[0]);continue;}
     const html=page.html||"",email=extractEmail(html);
     const candidate={category:item.category,name,country:null,dsp_name:item.category==="playlist"?"Spotify":null,
      genres:[],website_url:ev.spotifyUrl||finalUrl,submission_url:ev.ok?finalUrl:null,contact_email:email,
@@ -162,7 +162,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:0,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:0,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),duplicateDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
