@@ -6,7 +6,12 @@ const SERVICE_ROLE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GOOGLE_API_KEY=process.env.GOOGLE_CSE_API_KEY;
 const GOOGLE_CX=process.env.GOOGLE_CSE_ID;
 if(![SUPABASE_URL,SERVICE_ROLE_KEY,GOOGLE_API_KEY,GOOGLE_CX].every(Boolean)) throw new Error("Missing required Supabase or Google CSE configuration.");
-const headers={apikey:SERVICE_ROLE_KEY,Authorization:"Bearer "+SERVICE_ROLE_KEY,"Content-Type":"application/json"};
+// Supabase's newer sb_secret_* keys are API keys, not JWTs: send them only
+// in apikey. Legacy service_role keys are JWTs and may also be sent as Bearer.
+const isNewSecretKey=SERVICE_ROLE_KEY.startsWith("sb_secret_");
+if(SERVICE_ROLE_KEY.startsWith("sb_publishable_")||SERVICE_ROLE_KEY.startsWith("sb_anon_")) throw new Error("SUPABASE_SERVICE_ROLE_KEY must be a server-side Supabase secret key (sb_secret_*) or legacy service_role JWT, not a publishable/anon key.");
+if(!isNewSecretKey&&SERVICE_ROLE_KEY.split(".").length!==3) throw new Error("SUPABASE_SERVICE_ROLE_KEY must be an sb_secret_* key or a legacy three-part service_role JWT.");
+const headers={apikey:SERVICE_ROLE_KEY,...(isNewSecretKey?{}:{Authorization:"Bearer "+SERVICE_ROLE_KEY}),"Content-Type":"application/json"};
 const queries=[
  {category:"playlist",q:'Spotify playlist "submit your track" OR "submit music" free curator'},
  {category:"radio_station",q:'radio station "music submissions" OR "submit your music" independent artists'},
