@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
- extractSubmissionRoute,extractPlaylistName,parseGoogleNewsRss,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
+ extractSubmissionRoute,extractPlaylistName,parseSearchRss,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
 } from "./opportunity-discovery-core.mjs";
 
 test("extracts a music submission form action",()=>{
@@ -62,19 +62,30 @@ test("rejects generic listen-on-Spotify labels as playlist names",()=>{
  assert.equal(extractPlaylistName('<a href="https://open.spotify.com/playlist/abc123">Listen on Spotify</a>',"https://open.spotify.com/playlist/abc123","Listen on Spotify"),"");
 });
 
-test("parses safe Google News RSS results, including resolvable wrappers",()=>{
- const parsed=parseGoogleNewsRss(`<?xml version="1.0"?><rss><channel>
-  <item><title><![CDATA[Afro House playlist curator opportunity]]></title>
-   <link>https://publisher.example/playlist</link>
-   <description><![CDATA[Submit your music]]></description>
-   <pubDate>Thu, 12 Nov 2026 00:00:00 GMT</pubDate></item>
+test("parses Bing RSS items, snippets and publisher sources while blocking unsafe URLs",()=>{
+ const parsed=parseSearchRss(\`<?xml version="1.0"?><rss version="2.0"><channel>
+  <item><title><![CDATA[Afro House curator submissions]]></title>
+   <link>https://www.bing.com/ck/a?url=https%3A%2F%2Fcurator.example%2Fsubmit</link>
+   <description><![CDATA[Playlist curator accepting music submissions]]></description>
+   <source url="https://curator.example">Curator Journal</source></item>
   <item><title>Unsafe destination</title><link>http://127.0.0.1/private</link><description>blocked</description></item>
-  <item><title>Google News wrapper</title><link>https://news.google.com/rss/articles/abc123</link><description>resolve before inspection</description></item>
- </channel></rss>`);
- assert.equal(parsed.length,2);
- assert.equal(parsed[0].title,"Afro House playlist curator opportunity");
- assert.equal(parsed[0].url,"https://publisher.example/playlist");
- assert.equal(parsed[1].url,"https://news.google.com/rss/articles/abc123");
+ </channel></rss>\`);
+ assert.equal(parsed.length,1);
+ assert.equal(parsed[0].title,"Afro House curator submissions");
+ assert.match(parsed[0].link,/bing\.com/);
+ assert.equal(parsed[0].snippet,"Playlist curator accepting music submissions");
+ assert.equal(parsed[0].publisherUrl,"https://curator.example");
+});
+test("parses Atom link attributes and rejects non-public destinations",()=>{
+ const parsed=parseSearchRss(\`<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><title>Spotify playlist submission page</title>
+   <link href="https://curator.example/playlist"/>
+   <summary>Active playlist curator</summary></entry>
+  <entry><title>Private IP</title><link href="http://192.168.1.1/"/></entry>
+ </feed>\`);
+ assert.equal(parsed.length,1);
+ assert.equal(parsed[0].link,"https://curator.example/playlist");
+ assert.equal(parsed[0].snippet,"Active playlist curator");
 });
 test("does not substitute a curator page title for a missing playlist label",()=>{
  assert.equal(extractPlaylistName("<h1>Curator Platform</h1>","https://open.spotify.com/playlist/abc123","Curator Platform"),"");
