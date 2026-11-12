@@ -1,3 +1,5 @@
+import { extractSubmissionRoute, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
+
 // Global music-opportunity discovery for Artist Frequency.
 // Public playlist discovery target: 18,000+ unique opportunities over time.
 // The target is a research backlog goal, NOT a claim about Spotify's playlist count.
@@ -5,7 +7,8 @@
 // second-source corroboration. Published listings never enable in-platform submissions.
 const SUPABASE_URL=process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
-if(![SUPABASE_URL,SERVICE_ROLE_KEY].every(Boolean)) throw new Error("Missing required Supabase configuration.");
+const BRAVE_SEARCH_API_KEY=process.env.BRAVE_SEARCH_API_KEY;
+if(![SUPABASE_URL,SERVICE_ROLE_KEY,BRAVE_SEARCH_API_KEY].every(Boolean)) throw new Error("Missing required Supabase or Brave Search configuration.");
 // Supabase's newer sb_secret_* keys are API keys, not JWTs: send them only
 // in apikey. Legacy service_role keys are JWTs and may also be sent as Bearer.
 const isNewSecretKey=SERVICE_ROLE_KEY.startsWith("sb_secret_");
@@ -63,6 +66,9 @@ const platformPlaylistQueries=[
  {category:"playlist",dsp:"Pitchplaylists curator profiles",q:'site:pitchplaylists.com "Spotify playlist" "followers" curator'}
 ];
 const queries=[...playlistQueries,...platformPlaylistQueries];
+const queryRotationIndex=Math.floor(Date.now()/3600000)%queries.length;
+const searchesPerRun=Math.max(1,Math.min(2,Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1)));
+const activeQueries=Array.from({length:searchesPerRun},(_,i)=>queries[(queryRotationIndex+i)%queries.length]);
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
  const res=await fetch(url,{...options,signal:AbortSignal.timeout(15000)});
@@ -77,94 +83,51 @@ function decodeHtml(s){
  return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
 function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\s+/g," ").trim();}
-function rssItems(xml){
- const source=String(xml||"");
- const blocks=[...source.matchAll(/<(?:item|entry)\b[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi)];
- return blocks.map(m=>{
-  const block=m[1];
-  const field=(tag)=>{const x=block.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));return x?stripTags(x[1].replace(/^<!\[CDATA\[|\]\]>$/g,"")):"";};
-  let link=field("link");
-  if(!link){const x=block.match(/<link\b[^>]*href=["']([^"']+)["']/i);if(x)link=decodeHtml(x[1]);}
-  const sourceTag=block.match(/<source\b([^>]*)>([\s\S]*?)<\/source>/i);
-  const sourceAttr=sourceTag?.[1]?.match(/url=["']([^"']+)["']/i);
-  const publisherUrl=sourceAttr?decodeHtml(sourceAttr[1]):null;
-  return {title:field("title"),link,snippet:field("description")||field("summary"),publisherUrl};
- }).filter(x=>/^https?:\/\//i.test(x.link));
-}
-async function fetchFeed(url,label){
- const res=await fetch(url,{headers:{"Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"},signal:AbortSignal.timeout(18000)});
- const body=await res.text();
- if(!res.ok)throw new Error(label+" HTTP "+res.status+": "+body.slice(0,160).replace(/\s+/g," "));
- const items=rssItems(body);
- if(items.length)return items;
- const validFeed=/<(?:rss|feed)\b/i.test(body);
- const hasEntries=/<(?:item|entry)\b/i.test(body);
- const reason=validFeed&&!hasEntries?"valid RSS/Atom feed contained zero entries":"response contained entries or content that the parser could not extract";
- throw new Error(label+" "+reason+" (type="+(res.headers.get("content-type")||"unknown")+", bytes="+body.length+", preview="+body.slice(0,100).replace(/\s+/g," ")+")");
-}
-function googleNewsEmbeddedUrl(link){
- try{
-  const match=String(link).match(/\/rss\/articles\/([^?]+)/i);if(!match)return null;
-  const decoded=Buffer.from(match[1].replace(/-/g,"+").replace(/_/g,"/"),"base64").toString("utf8");
-  const urls=decoded.match(/https?:\/\/[^\s"'<>\\u0000-\\u001f]+/g)||[];
-  for(const raw of urls){try{const u=new URL(raw);if(!/(^|\.)news\.google\.com$/i.test(u.hostname))return u.toString();}catch{}}
- }catch{} return null;
-}
 async function search(q){
- const providers=[
-  {name:"Bing RSS",run:async()=>{
-   const u=new URL("https://www.bing.com/search");
-   u.searchParams.set("format","rss");u.searchParams.set("q",q);u.searchParams.set("count","20");
-   return fetchFeed(u,"Bing RSS");
-  }},
-  {name:"Google News RSS",run:async()=>{
-   const u=new URL("https://news.google.com/rss/search");
-   u.searchParams.set("q",q);u.searchParams.set("hl","en-US");u.searchParams.set("gl","US");u.searchParams.set("ceid","US:en");
-   return fetchFeed(u,"Google News RSS");
-  }},
-
- ];
- const results=await Promise.allSettled(providers.map(async p=>({provider:p.name,items:await p.run()})));
- const buckets=[],stats={};
- for(let i=0;i<results.length;i++){
-  const r=results[i],name=providers[i].name;
-  if(r.status!=="fulfilled"){stats[name]={count:0,error:String(r.reason?.message||r.reason).slice(0,500)};continue;}
-  const items=r.value.items.slice(0,20);
-  stats[name]={count:items.length,error:null};
-  const bucket=[];
-  for(const hit of items){
-   let link=hit.link;
-   // Resolve common Bing redirect wrappers before inspecting the destination.
-   try{const p=new URL(link);if(p.hostname.endsWith("bing.com")&&p.searchParams.has("url"))link=p.searchParams.get("url");}catch{}
-   bucket.push({...hit,link,provider:name,publisherUrl:hit.publisherUrl||null});
-  }
-  buckets.push(bucket);
+ const u=new URL("https://api.search.brave.com/res/v1/web/search");
+ u.searchParams.set("q",q);u.searchParams.set("count","20");
+ u.searchParams.set("safesearch","strict");u.searchParams.set("spellcheck","false");u.searchParams.set("extra_snippets","true");
+ let lastError=null;
+ for(let attempt=0;attempt<3;attempt++){
+  try{
+   const res=await fetch(u,{headers:{"Accept":"application/json","X-Subscription-Token":BRAVE_SEARCH_API_KEY,"User-Agent":"ArtistFrequencyOpportunityDiscovery/2.0"},signal:AbortSignal.timeout(18000)});
+   const body=await res.text();
+   if(!res.ok){const error=new Error("Brave Search API HTTP "+res.status+": "+body.slice(0,300));if(res.status===429||res.status>=500){lastError=error;await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)));continue;}throw error;}
+   const data=JSON.parse(body);
+   const items=(data.web?.results||[]).map(hit=>({title:String(hit.title||""),link:String(hit.url||""),snippet:String([hit.description,...(hit.extra_snippets||[])].filter(Boolean).join(" ")),provider:"Brave Search API",publisherUrl:null,pageAge:hit.page_age||null})).filter(hit=>isSafePublicHttpUrl(hit.link));
+   return {items,providerStats:{"Brave Search API":{count:items.length,error:null}}};
+  }catch(e){lastError=e;if(attempt===2)break;}
  }
- // Round-robin providers so the first engine cannot crowd out the others.
- const unique=[],seen=new Set();
- for(let index=0;index<20;index++){
-  for(const bucket of buckets){
-   const hit=bucket[index];if(!hit)continue;
-   try{
-    const u=new URL(hit.link);u.hash="";u.search="";
-    const key=u.toString().replace(/\/$/,"").toLowerCase();
-    if(seen.has(key))continue;seen.add(key);unique.push(hit);
-   }catch{}
-   if(unique.length>=20)break;
-  }
-  if(unique.length>=20)break;
- }
- return {items:unique,providerStats:stats};
+ throw lastError||new Error("Brave Search API failed without a response");
+}
+async function readLimitedText(response,maxBytes=250000){
+ const reader=response.body?.getReader();if(!reader)return "";
+ const decoder=new TextDecoder();let output="",total=0;
+ try{while(total<maxBytes){const {done,value}=await reader.read();if(done)break;const remaining=maxBytes-total;const chunk=value.byteLength>remaining?value.slice(0,remaining):value;output+=decoder.decode(chunk,{stream:true});total+=chunk.byteLength;if(value.byteLength>remaining)break;}}
+ finally{try{await reader.cancel();}catch{}}
+ return output+decoder.decode();
 }
 async function inspect(url){
- try{
-  const res=await fetch(url,{redirect:"follow",signal:AbortSignal.timeout(12000),headers:{"User-Agent":"ArtistFrequencyOpportunityResearch/1.1"}});
-  if(!res.ok)return {ok:false,reason:"HTTP "+res.status};
-  const type=res.headers.get("content-type")||"";
-  const html=type.includes("text")?(await res.text()).slice(0,250000):"";
-  if(/captcha|cloudflare challenge|access denied/i.test(html.slice(0,12000)))return {ok:false,reason:"Blocked by challenge; manual review required"};
-  return {ok:true,finalUrl:res.url,html};
- }catch(e){return {ok:false,reason:String(e.message||e)};}
+ let current=String(url||"");
+ for(let hop=0;hop<=5;hop++){
+  if(!isSafePublicHttpUrl(current))return {ok:false,reason:"Unsafe or non-public URL blocked"};
+  try{
+   const res=await fetch(current,{redirect:"manual",signal:AbortSignal.timeout(12000),headers:{"User-Agent":"ArtistFrequencyOpportunityResearch/2.0","Accept":"text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5"}});
+   if([301,302,303,307,308].includes(res.status)){
+    const location=res.headers.get("location");if(!location)return {ok:false,reason:"Redirect response had no Location header"};
+    if(hop===5)return {ok:false,reason:"Redirect limit exceeded"};
+    try{current=new URL(location,current).toString();}catch{return {ok:false,reason:"Invalid redirect destination"};}
+    continue;
+   }
+   if(!res.ok)return {ok:false,reason:"HTTP "+res.status};
+   const type=(res.headers.get("content-type")||"").toLowerCase();
+   if(type&&!/(text\/|application\/(xhtml\+xml|xml|json))/i.test(type))return {ok:false,reason:"Unsupported page content type: "+type.slice(0,80)};
+   const html=await readLimitedText(res,250000);
+   if(/captcha|cloudflare challenge|access denied/i.test(html.slice(0,12000)))return {ok:false,reason:"Blocked by challenge; automated inspection withheld"};
+   return {ok:true,finalUrl:current,html};
+  }catch(e){return {ok:false,reason:String(e.message||e).slice(0,200)};}
+ }
+ return {ok:false,reason:"Redirect limit exceeded"};
 }
 function cleanName(s){return String(s||"").replace(/\s+/g," ").replace(/[|<>]/g,"").trim().slice(0,160);}
 function extractEmail(html){
@@ -258,131 +221,43 @@ function extractPlaylistMetrics(value){
  const inactiveEvidence=/\b(?:inactive|paused|closed|disabled|not active)\b/i.test(text);
  return {followerCount,responseRate,activityStatus:activeEvidence&&!inactiveEvidence?"active":"unknown",activeEvidence,inactiveEvidence};
 }
-function evidence(category,title,snippet,html,url){
+function evidence(category,title,snippet,html,url,routeOverride=null){
  const page=String(html||"").slice(0,150000).toLowerCase();
+ const route=routeOverride||extractSubmissionRoute(html,url);
  if(category==="playlist"){
   const dspPlaylist=extractDspPlaylist(html,url,snippet);
   if(!dspPlaylist)return {ok:false,reason:"No individual public DSP playlist URL found"};
   const hasSubmissionLanguage=/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here|accepting submissions)/i.test(page);
-  const route=/<form\b/i.test(page)||/mailto:/i.test(page)||/href\s*=\s*["'][^"']*(submit|submission|demo|upload|pitch)[^"']*["']/i.test(page)||/\/(submit|submission|demo|music-upload|pitch)(\/|\?|$)/i.test(url);
-  return {ok:hasSubmissionLanguage&&route,reason:hasSubmissionLanguage&&route?null:"Playlist found; submission route not independently confirmed",playlistUrl:dspPlaylist.url,dspName:dspPlaylist.dsp,directPlaylist:true,routeFound:route,categoryMatch:true};
+  return {ok:hasSubmissionLanguage&&!!route,reason:hasSubmissionLanguage&&route?null:"Playlist found; a live submission route was not independently confirmed",playlistUrl:dspPlaylist.url,dspName:dspPlaylist.dsp,directPlaylist:true,routeFound:!!route,submissionUrl:route?.url||null,submissionMethod:route?.method||"unknown",categoryMatch:true};
  }
- if(!/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here|accepting submissions)/i.test(page))
-  return {ok:false,reason:"Inspected publisher page has no explicit music-submission evidence"};
- const route=/<form\b/i.test(page)||/mailto:/i.test(page)||/href\s*=\s*["'][^"']*(submit|submission|demo|upload|pitch)[^"']*["']/i.test(page)||/\/(submit|submission|demo|music-upload|pitch)(\/|\?|$)/i.test(url);
- if(!route)return {ok:false,reason:"No identifiable submission route on inspected publisher page"};
+ if(!/(submit music|submit your music|submit a track|submit track|music submission|send music|send us music|artist submissions|demo submission|submit here|accepting submissions)/i.test(page))return {ok:false,reason:"Inspected publisher page has no explicit music-submission evidence"};
+ if(!route)return {ok:false,reason:"No identifiable HTTPS submission route on inspected publisher page"};
  if(category==="radio_station"&&!/(radio|broadcast|fm|station)/i.test(page))return {ok:false,reason:"No radio-station identity on inspected publisher page"};
  if(category==="blogger"&&!/(music blog|blog|magazine|editorial|music review|press)/i.test(page))return {ok:false,reason:"No music-editorial identity on inspected publisher page"};
  if(category==="curator"&&!/(playlist|curator|spotify)/i.test(page))return {ok:false,reason:"No playlist-curator identity on inspected publisher page"};
  if(category==="platform"&&!/(music|playlist|radio|blog|curator|artist)/i.test(page))return {ok:false,reason:"No music-submission platform identity on inspected page"};
- return {ok:true,directPageEvidence:true,routeFound:true,categoryMatch:true};
+ return {ok:true,directPageEvidence:true,routeFound:true,submissionUrl:route.url,submissionMethod:route.method,categoryMatch:true};
 }
-function hostnameOf(value){
- try{return new URL(value).hostname.toLowerCase().replace(/^www\./,"");}catch{return "";}
-}
-async function resolveGoogleNewsPublisher(hit){
- const title=cleanName(hit.title);if(!title)return null;
- const publisherHost=hostnameOf(hit.publisherUrl);
- const terms=title.toLowerCase().split(/\s+/).filter(x=>x.length>3).slice(0,6);
- const match=String(hit.link||"").match(/\/(?:rss\/)?articles\/([^?]+)/i);
- if(match){
-  const articleId=match[1];
-  // Current Google News RSS IDs are opaque. Resolve through the article-page
-  // signature and batchexecute RPC rather than treating redirects as URLs.
-  for(const path of ["/rss/articles/","/articles/"]){
-   try{
-    const articleUrl="https://news.google.com"+path+articleId;
-    const page=await fetch(articleUrl,{redirect:"follow",signal:AbortSignal.timeout(12000),headers:{
-     "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-     "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-     "Accept-Language":"en-US,en;q=0.9","Cookie":"CONSENT=PENDING+987","Upgrade-Insecure-Requests":"1"
-    }});
-    if(!page.ok)continue;
-    const html=await page.text();
-    const sigMatch=html.match(/data-n-a-sg=["']([^"']+)["']/i);
-    const tsMatch=html.match(/data-n-a-ts=["'](\d+)["']/i);
-    if(!sigMatch||!tsMatch)continue;
-    const inner=JSON.stringify(["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],articleId,Number(tsMatch[1]),sigMatch[1]]);
-    const outer=JSON.stringify([[["Fbv4je",inner]]]);
-    const response=await fetch("https://news.google.com/_/DotsSplashUi/data/batchexecute",{method:"POST",redirect:"follow",signal:AbortSignal.timeout(12000),headers:{
-     "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Origin":"https://news.google.com","Referer":"https://news.google.com/","X-Same-Domain":"1",
-     "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-     "Accept":"*/*","Cookie":"CONSENT=PENDING+987"
-    },body:"f.req="+encodeURIComponent(outer)});
-    if(!response.ok)continue;
-    const raw=await response.text();
-    const split=raw.indexOf("\n\n");
-    const payloadText=split>=0?raw.slice(split+2):raw.replace(/^\)\]\}'[^\n]*\n?/,"");
-    let frames;try{frames=JSON.parse(payloadText);}catch{continue;}
-    const frame=Array.isArray(frames)?frames.find(x=>Array.isArray(x)&&x[0]==="wrb.fr"&&x[1]==="Fbv4je"):null;
-    if(!frame||typeof frame[2]!=="string")continue;
-    let decoded;try{decoded=JSON.parse(frame[2]);}catch{continue;}
-    const destination=Array.isArray(decoded)&&decoded[0]==="garturlres"?decoded[1]:null;
-    if(!destination)continue;
-    try{
-     const target=new URL(destination),host=hostnameOf(destination);
-     if(!/^https?:$/.test(target.protocol)||!host||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
-     return target.toString();
-    }catch{}
-   }catch{}
+async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl,dspName,hits){
+ const primaryHost=hostnameOf(primaryUrl),primaryDomain=registrableDomain(primaryUrl);
+ const terms=String(name||"").toLowerCase().split(/[^a-z0-9]+/i).filter(x=>x.length>3&&!["playlist","music","official","curated","best","with","from","that"].includes(x)).slice(0,6);
+ if(!primaryHost||!primaryDomain||!terms.length)return {ok:false,reason:"Insufficient identity terms for independent corroboration"};
+ for(const hit of (hits||[]).slice(0,20)){
+  const candidate=hit.link,host=hostnameOf(candidate),domain=registrableDomain(candidate);
+  if(!host||!isSafePublicHttpUrl(candidate)||!domain||domain===primaryDomain||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
+  const searchable=(String(hit.title||"")+" "+String(hit.snippet||"")).toLowerCase();
+  const overlap=terms.filter(term=>searchable.includes(term)).length;
+  if((playlistUrl&&searchable.includes(playlistUrl.toLowerCase()))||overlap>=Math.min(2,terms.length)){
+   const inspected=await inspect(candidate);if(!inspected.ok)continue;
+   const body=stripTags(inspected.html||"").toLowerCase(),bodyOverlap=terms.filter(term=>body.includes(term)).length;
+   const identityMatch=(playlistUrl&&String(inspected.html||"").includes(playlistUrl))||bodyOverlap>=Math.min(2,terms.length);
+   const categoryMatch=category==="playlist"?/(spotify|playlist|curator)/i.test(body):category==="radio_station"?/(radio|broadcast|fm|station)/i.test(body):category==="blogger"?/(music blog|magazine|music review|editorial)/i.test(body):category==="platform"?/(music submission|submission portal|playlist|radio|blog|curator)/i.test(body):/(playlist|curator|spotify)/i.test(body);
+   if(identityMatch&&categoryMatch&&registrableDomain(inspected.finalUrl||candidate)!==primaryDomain)return {ok:true,url:inspected.finalUrl||candidate,host:hostnameOf(inspected.finalUrl||candidate),domain:registrableDomain(inspected.finalUrl||candidate),identityMatch:true,categoryMatch:true,reachable:true};
   }
  }
- // Retain exact-headline search as a fallback; publisher-scoped results must
- // remain on the publisher's RSS source domain.
- for(const scoped of [true,false]){
-  try{
-   const u=new URL("https://www.bing.com/search");u.searchParams.set("format","rss");
-   u.searchParams.set("q",'"'+title.replace(/["']/g," ")+'"'+(scoped&&publisherHost?" site:"+publisherHost:""));
-   u.searchParams.set("count","10");
-   const results=await fetchFeed(u,scoped?"Bing publisher-headline resolution":"Bing exact-headline resolution");
-   for(const item of results.slice(0,10)){
-    const candidate=item.link,host=hostnameOf(candidate);
-    if(!host||host==="news.google.com"||host.endsWith(".news.google.com")||host==="bing.com"||host.endsWith(".bing.com"))continue;
-    if(scoped&&publisherHost&&host!==publisherHost)continue;
-    const overlap=terms.filter(t=>(item.title||"").toLowerCase().includes(t)).length;
-    if(overlap<Math.min(2,terms.length))continue;
-    const page=await inspect(candidate);if(!page.ok)continue;
-    const body=stripTags(page.html||"").toLowerCase();
-    if(terms.filter(t=>body.includes(t)).length>=Math.min(2,terms.length))return page.finalUrl||candidate;
-   }
-  }catch{}
- }
- return null;
+ return {ok:false,reason:"No second reachable independent domain in this search batch corroborated the same playlist identity"};
 }
-async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl,dspName){
- const primaryHost=hostnameOf(primaryUrl);
- const queryName=String(name||"").replace(/[^\p{L}\p{N} ]/gu," ").replace(/\s+/g," ").trim().slice(0,100);
- if(!queryName)return {ok:false,reason:"No usable identity for second-source search"};
- const q=category==="playlist"
-  ? `"${queryName}" ${dspName||"music"} playlist curator`
-  : `"${queryName}" music submissions ${category==="radio_station"?"radio station":category==="blogger"?"music blog":"playlist curator"}`;
- let found;
- try{found=await search(q);}catch(e){return {ok:false,reason:"Independent search failed: "+String(e.message||e).slice(0,180)};}
- const terms=queryName.toLowerCase().split(/\s+/).filter(x=>x.length>2).slice(0,3);
- for(const hit of (found.items||[]).slice(0,8)){
-  const url=hit.link;
-  const host=hostnameOf(url);
-  if(!host||host===primaryHost||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
-  const inspected=await inspect(url);
-  if(!inspected.ok)continue;
-  const html=String(inspected.html||"").slice(0,180000);
-  const textContent=stripTags(html).toLowerCase();
-  const identityMatch=(playlistUrl&&html.includes(playlistUrl))||terms.filter(t=>textContent.includes(t)).length>=Math.min(2,terms.length);
-  const categoryMatch=category==="playlist"
-    ? /(spotify|playlist|curator)/i.test(textContent)
-    : category==="radio_station"
-      ? /(radio|broadcast|fm|station)/i.test(textContent)
-      : category==="blogger"
-        ? /(music blog|magazine|music review|editorial)/i.test(textContent)
-        : category==="platform"
-          ? /(music submission|submission portal|playlist|radio|blog|curator)/i.test(textContent)
-          : /(playlist|curator|spotify)/i.test(textContent);
-  if(identityMatch&&categoryMatch&&hostnameOf(inspected.finalUrl||url)!==primaryHost){
-   return {ok:true,url:inspected.finalUrl||url,host:hostnameOf(inspected.finalUrl||url),identityMatch:true,categoryMatch:true,reachable:true};
-  }
- }
- return {ok:false,reason:"No reachable, identity-matching independent source found"};
-}
+
 async function main(){
  let autoPublicationEnabled=true;
  try{await rest("opportunity_discovery_candidates?select=auto_verification&limit=0");}
