@@ -31,8 +31,7 @@ export function isSafePublicHttpUrl(value){
   if(!["http:","https:"].includes(u.protocol)||u.username||u.password)return false;
   const host=u.hostname.toLowerCase().replace(/^\[|\]$/g,"");
   if(!host||BLOCKED_HOSTS.has(host)||host.endsWith(".localhost")||host.endsWith(".local")||host.endsWith(".internal"))return false;
-  if(isPrivateIpv4(host)||host==="::1"||host.startsWith("fc")||host.startsWith("fd")||host.startsWith("fe80:"))return false;
-  if(/^\d+\.\d+\.\d+\.\d+$/.test(host))return false;
+  if(host.includes(":")||isPrivateIpv4(host)||/^\d+(?:\.\d+)*$/.test(host)||/^0x[0-9a-f]+$/i.test(host))return false;
   return true;
  }catch{return false;}
 }
