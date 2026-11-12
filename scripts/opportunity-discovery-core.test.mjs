@@ -53,3 +53,7 @@ test("extracts the playlist name from the anchor for its Spotify URL",()=>{
 test("does not use a generic page heading as a playlist name",()=>{
  assert.equal(extractPlaylistName("<h1>Submit your music</h1>","https://open.spotify.com/playlist/abc123","Submit your music"),"");
 });
+
+test("rejects unrelated pitch links without music context",()=>{
+ assert.equal(extractSubmissionRoute('<a href="/pitch">Pitch us</a>',"https://curator.example"),null);
+});
