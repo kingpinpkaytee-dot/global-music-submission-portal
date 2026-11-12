@@ -78,10 +78,10 @@ export function extractPlaylistName(html,playlistUrl,pageTitle=""){
   const href=anchor[1].match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1]||"";
   if(!href.includes(id))continue;
   const label=stripTags(anchor[2]).replace(/\s*(?:\||–|-)\s*(?:listen on spotify|spotify|listen now)\s*$/i,"").trim();
-  if(label.length>=4&&!/^(spotify|listen|listen now|playlist|music playlist|submit music|submit your music|music submission)$/i.test(label))return label.slice(0,160);
+  if(label.length>=4&&!/^(spotify|listen|listen now|listen on spotify|view on spotify|open spotify|play on spotify|playlist|music playlist|submit music|submit your music|music submission|submit here)$/i.test(label))return label.slice(0,160);
  }
  const fallback=stripTags(String(pageTitle||"")).replace(/\s*(?:\||–|-)\s*(?:submit music|submit your music|music submission|submit here|listen on spotify|spotify)\s*$/i,"").trim();
- if(fallback.length>=4&&!/^(spotify|listen|listen now|playlist|music playlist|submit music|submit your music|music submission)$/i.test(fallback))return fallback.slice(0,160);
+ if(fallback.length>=4&&!/^(spotify|listen|listen now|listen on spotify|view on spotify|open spotify|play on spotify|playlist|music playlist|submit music|submit your music|music submission|submit here)$/i.test(fallback))return fallback.slice(0,160);
  return "";
 }
 
