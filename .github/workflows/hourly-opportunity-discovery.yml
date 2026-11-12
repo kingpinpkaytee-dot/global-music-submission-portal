@@ -29,6 +29,8 @@ jobs:
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "::error::Missing Actions secret SUPABASE_SERVICE_ROLE_KEY"; exit 1)
       - name: Test opportunity qualification rules
         run: node --test scripts/opportunity-discovery-core.test.mjs
+      - name: Test website and automation integration
+        run: node --test scripts/site-automation-integration.test.mjs
       - name: Discover, verify and update opportunities
         env:
           SUPABASE_URL: https://mdcvewnevgsgmyfnybgn.supabase.co
