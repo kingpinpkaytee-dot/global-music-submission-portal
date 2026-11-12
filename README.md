@@ -110,7 +110,7 @@ The canonical `artist-frequency` Vercel project remains paused, so its productio
 
 ## Further documentation
 
-See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md`, `docs/ADMIN_OPERATIONS.md` and `docs/VERCEL_DEPLOYMENT.md`.
+See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md`, `docs/ADMIN_OPERATIONS.md`, `docs/AUTONOMOUS_OPPORTUNITY_DISCOVERY.md` and `docs/VERCEL_DEPLOYMENT.md`.
 
 **Artist Frequency**  
 *Music. Passion. Legacy.*
@@ -270,11 +270,6 @@ Published directory records remain external reference listings only: is_integrat
 ## Publication safety history
 
 Migration 0026 introduced an admin bulk-publish RPC. Migration 0027 disabled that bulk-publish path at the database boundary. The new autonomous route is a separate, service-role-only RPC with stricter evidence checks; it does not re-enable the admin bulk-publish RPC.
-## Opportunity publication batch (migration 0026)
+## Opportunity publication batch (migrations 0026–0029)
 
-- Migrations 0019–0021 contain 25 intended public seed listings (3 + 6 + 16) and use idempotent inserts.
-- Migration 0024 stages 27 researched candidates privately for administrator review.
-- Migration 0026 adds the administrator-only `admin_publish_all_pending_opportunity_candidates()` RPC and the admin workspace bulk-publish control.
-- The bulk action publishes only candidates with source evidence and a submission URL or public contact email; duplicates are linked to existing directory rows and incomplete candidates remain pending.
-- Published records are public, active and administrator-approved, but `is_integrated=false` and `accepts_submissions=false`; external links are visible, while credit-charged in-platform dispatch remains disabled.
-- Apply migrations in sequence through 0026 before using the bulk-publish control. GitHub commits alone do not apply production database migrations or deploy the website.
+Migration 0026 introduced an admin-only bulk-publish RPC, and migration 0027 disabled that route. Migrations 0028–0029 define the new controlled autonomous playlist-publication policy. Production must apply 0028 and 0029 in numeric order before the worker can publish. GitHub commits alone do not apply Supabase migrations or deploy the website.
