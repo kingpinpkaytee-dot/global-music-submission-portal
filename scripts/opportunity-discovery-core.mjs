@@ -15,6 +15,35 @@ function decodeXml(value){
   .replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
 
+
+export function parseSearchRss(xml){
+ const source=String(xml||"");
+ const items=[];
+ const blocks=[...source.matchAll(/<(?:item|entry)\b[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi)];
+ for(const match of blocks){
+  const block=match[1];
+  const field=tag=>{
+   const found=block.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));
+   if(!found)return "";
+   return stripTags(decodeXml(found[1].replace(/^<!\[CDATA\[|\]\]>$/g,"").trim()));
+  };
+  const title=field("title");
+  const snippet=field("description")||field("summary")||field("content");
+  let link=field("link");
+  if(!link){
+   const linked=block.match(/<link\b[^>]*href=["']([^"']+)["']/i);
+   if(linked)link=decodeXml(linked[1]);
+  }
+  const sourceTag=block.match(/<source\b([^>]*)>([\s\S]*?)<\/source>/i);
+  const sourceUrl=sourceTag?.[1]?.match(/\burl=["']([^"']+)["']/i)?.[1];
+  const publisherUrl=sourceUrl?decodeXml(sourceUrl):null;
+  if(title&&isSafePublicHttpUrl(link)){
+   items.push({title,link,snippet,publisherUrl});
+  }
+ }
+ return items;
+}
+
 export function parseGoogleNewsRss(xml){
  const source=String(xml||"");
  const items=[];
