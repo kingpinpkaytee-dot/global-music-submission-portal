@@ -44,7 +44,7 @@ Missing metrics, uncertain activity, missing route, unsafe URL, or missing indep
 
 - Search query rotation spreads the territory/platform coverage across hourly runs.
 - One search task per run is the default; the workflow caps the configurable setting at two.
-- Independent-source inspection is capped at five attempts per run to control runtime and cost.
+- Independent-source inspection is capped at ten attempts per run, with no more than two attempts for one candidate to control runtime and cost.
 - Only HTTP(S) URLs are accepted; URL credentials, IP-literal hosts, localhost/private destinations and unsafe redirect targets are blocked.
 - Redirects are followed manually with a five-hop limit; page reads are capped at 250 KB.
 - Search-result snippets are not persisted.
