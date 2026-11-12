@@ -186,9 +186,19 @@ function detectDspPlaylistUrl(value){
 }
 function extractDspPlaylist(html,url,snippet){
  const direct=detectDspPlaylistUrl(url);if(direct)return direct;
- const haystack=String(html||"")+" "+String(snippet||"");
- const links=[...haystack.matchAll(/https?:\/\/[^\s"'<>]+/gi)].map(m=>decodeHtml(m[0]));
- for(const link of links){const found=detectDspPlaylistUrl(link);if(found)return found;}
+ // Publisher pages often serialize playlist links inside JSON/JS with escaped slashes.
+ const raw=String(html||"")+" "+String(snippet||"");
+ const normalized=decodeHtml(raw)
+  .replace(/\\\//g,"/")
+  .replace(/\\u002f/gi,"/")
+  .replace(/\\u003a/gi,":")
+  .replace(/\\u0026/gi,"&")
+  .replace(/\\x2f/gi,"/")
+  .replace(/\\x3a/gi,":");
+ for(const source of [raw,normalized]){
+  const links=[...source.matchAll(/https?:\/\/[^\s"'<>\\]+/gi)].map(m=>decodeHtml(m[0]));
+  for(const link of links){const found=detectDspPlaylistUrl(link);if(found)return found;}
+ }
  return null;
 }
 function extractCuratorProfileLinks(html,baseUrl){
