@@ -190,7 +190,6 @@ COMMIT;
   WHERE category = 'playlist'
     AND (
       lower(coalesce(website_url,'')) = lower(candidate.website_url)
-      OR lower(name) = lower(candidate.name)
       OR lower(coalesce(source_url,'')) = lower(candidate.source_url)
     )
   LIMIT 1;
