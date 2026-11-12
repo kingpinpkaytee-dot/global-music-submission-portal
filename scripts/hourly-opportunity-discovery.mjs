@@ -132,6 +132,18 @@ async function inspect(url){
  return {ok:false,reason:"Redirect limit exceeded"};
 }
 function cleanName(s){return String(s||"").replace(/\s+/g," ").replace(/[|<>]/g,"").trim().slice(0,160);}
+function extractPageTitle(html){
+ const source=String(html||"");
+ const candidates=[
+  source.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1],
+  source.match(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i)?.[1],
+  source.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1],
+  source.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
+ ];
+ for(const value of candidates){const title=cleanName(stripTags(value||""));if(title.length>=3)return title;}
+ return "";
+}
+
 function extractEmail(html){
  const found=[...String(html||"").matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig)].map(x=>x[0].toLowerCase());
  return found.find(e=>/(music|submit|demo|artist|press|radio|playlist)/i.test(e))||null;
@@ -287,17 +299,17 @@ async function main(){
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
     let urlHost=hostnameOf(url);
     if(!isSafePublicHttpUrl(url)){
-     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url,provider:hit.provider||"unknown",evidenceReason:"Unsafe or non-public destination blocked"});
+     rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Unsafe or non-public destination blocked"});
      rejected++;continue;
     }
     // Reject obvious dictionary/search-noise destinations before spending a page fetch.
     const noiseHosts=["dictionary.cambridge.org","cambridge.org","merriam-webster.com","vocabulary.com","thefreedictionary.com","dictionary.com","submittable.com"];
     if(noiseHosts.some(domain=>urlHost===domain||urlHost.endsWith("."+domain))){
-     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url,provider:hit.provider||"unknown",evidenceReason:"Excluded known dictionary or unrelated submission-platform noise"});
+     rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Excluded known dictionary or unrelated submission-platform noise"});
      rejected++;continue;
     }
     if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com")){
-     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url:hit.link,provider:hit.provider||"unknown",evidenceReason:"Google News redirect wrappers are excluded; only direct publisher URLs are accepted"});
+     rejectedDetails.push({category:item.category,name:"Rejected search result",url:hit.link,provider:hit.provider||"unknown",evidenceReason:"Google News redirect wrappers are excluded; only direct publisher URLs are accepted"});
      rejected++;continue;
     }
     let page=await inspect(url);
@@ -308,7 +320,8 @@ async function main(){
     const metricHtml=(profileEvidence.html||"")+" "+(page.html||"");
     const route=extractSubmissionRoute(page.html||"",page.finalUrl||url)
       ||(profileEvidence.html?extractSubmissionRoute(profileEvidence.html,profileEvidence.profileUrl):null);
-    const publisherTitle=extractPageTitle(page.html||"")||cleanName(hit.title);
+    const publisherTitle=extractPageTitle(page.html||"");
+    if(!publisherTitle){rejectedDetails.push({category:item.category,name:"Unidentified publisher page",url:page.finalUrl||url,provider:hit.provider||"unknown",evidenceReason:"Publisher page did not expose its own title"});rejected++;continue;}
     const ev=evidence(item.category,publisherTitle,"",metricHtml,page.finalUrl||url,route);
     const name=cleanName(publisherTitle);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
