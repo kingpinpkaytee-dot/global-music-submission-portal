@@ -13,7 +13,7 @@ This automation publishes opportunity directory records only. It does not submit
 The worker uses the DataForSEO Google Organic Live Advanced endpoint. It does not use Google Custom Search JSON, Bing RSS, or Google News RSS.
 
 - One search task per hourly run by default.
-- 48-query rotating pool: 18 territory searches and 30 Spotify curator/platform searches.
+- 57-query rotating pool: 27 territory searches and 30 Spotify curator/platform searches.
 - Up to 20 organic results per task.
 - The worker stores publisher-page-derived metadata after fetching and checking the actual publisher page. Raw search snippets are used only transiently and are not written into candidate records or run logs.
 - Actual task cost is read from DataForSEO's response and recorded in the Actions log.
