@@ -61,6 +61,13 @@ function decodeHtml(s){
  return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
 function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\s+/g," ").trim();}
+function isGenericSpotifyLanding(value){
+ try{
+  const u=new URL(value),host=u.hostname.toLowerCase().replace(/^www\./,"");
+  if(!["spotify.com","open.spotify.com","accounts.spotify.com","artists.spotify.com"].includes(host))return false;
+  return u.pathname==="/"||/^\/(?:intl-[a-z]{2}|us|gb|za|download|login|signup|get-started)(?:\/|$)/i.test(u.pathname);
+ }catch{return false;}
+}
 function resolveBingRedirect(value){
  try{
   const url=new URL(value);
@@ -294,6 +301,11 @@ async function main(){
     if(processedByCategory[item.category]>(item.category==="playlist"?180:12))continue;
     seen++;let url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
+    // If Bing links to a generic streaming landing page, prefer its explicitly
+    // attributed RSS publisher URL, but only when the publisher is safe and eligible.
+    if(isGenericSpotifyLanding(url)&&hit.publisherUrl&&isSafePublicHttpUrl(hit.publisherUrl)&&!isRestrictedAutomationSource(hit.publisherUrl)&&!isGenericSpotifyLanding(hit.publisherUrl)){
+     url=hit.publisherUrl;
+    }
     let urlHost=hostnameOf(url);
     if(!isSafePublicHttpUrl(url)){
      rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Unsafe or non-public destination blocked"});
@@ -419,7 +431,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||playlistRegions[queryRotationIndex%playlistRegions.length]),searchProvider:"Bing RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||"Global"),searchProvider:"Bing RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
