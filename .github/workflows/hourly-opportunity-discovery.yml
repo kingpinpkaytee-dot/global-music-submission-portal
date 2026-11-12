@@ -31,7 +31,5 @@ jobs:
         env:
           SUPABASE_URL: https://mdcvewnevgsgmyfnybgn.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
-          DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
           DISCOVERY_SEARCHES_PER_RUN: "1"
         run: node scripts/hourly-opportunity-discovery.mjs
