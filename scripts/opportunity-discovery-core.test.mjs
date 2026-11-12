@@ -57,3 +57,7 @@ test("does not use a generic page heading as a playlist name",()=>{
 test("rejects unrelated pitch links without music context",()=>{
  assert.equal(extractSubmissionRoute('<a href="/pitch">Pitch us</a>',"https://curator.example"),null);
 });
+
+test("rejects generic listen-on-Spotify labels as playlist names",()=>{
+ assert.equal(extractPlaylistName('<a href="https://open.spotify.com/playlist/abc123">Listen on Spotify</a>',"https://open.spotify.com/playlist/abc123","Listen on Spotify"),"");
+});
