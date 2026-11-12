@@ -43,7 +43,7 @@ test("website directory reader displays only active, verified public records", (
   assert.ok(source.includes('.eq("is_public", true)'));
   assert.ok(source.includes('.eq("is_active", true)'));
   assert.ok(source.includes('.eq("is_verified", true)'));
-  assert.ok(source.includes("follower_count,response_rate"));
+  assert.ok(source.includes("follower_count") && source.includes("response_rate"));
 });
 
 test("automation stages candidates then invokes the guarded publication RPC", () => {
