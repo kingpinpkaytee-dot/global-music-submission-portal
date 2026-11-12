@@ -248,14 +248,15 @@ async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl
  const terms=String(name||"").toLowerCase().split(/[^a-z0-9]+/i).filter(x=>x.length>3&&!["playlist","music","official","curated","best","with","from","that"].includes(x)).slice(0,6);
  if(!primaryHost||!primaryDomain||!terms.length)return {ok:false,reason:"Insufficient identity terms for independent corroboration"};
  if(!budget||budget.remaining<=0)return {ok:false,reason:"Per-run independent inspection budget exhausted"};
+ let attemptsForCandidate=0;
  for(const hit of (hits||[]).slice(0,20)){
   const candidate=hit.link,host=hostnameOf(candidate),domain=registrableDomain(candidate);
   if(!host||!isSafePublicHttpUrl(candidate)||!domain||domain===primaryDomain||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
   const searchable=(String(hit.title||"")+" "+String(hit.snippet||"")).toLowerCase();
   const overlap=terms.filter(term=>searchable.includes(term)).length;
   if((playlistUrl&&searchable.includes(playlistUrl.toLowerCase()))||overlap>=Math.min(2,terms.length)){
-   if(budget.remaining<=0)break;
-   budget.remaining--;
+   if(budget.remaining<=0||attemptsForCandidate>=2)break;
+   budget.remaining--;attemptsForCandidate++;
    const inspected=await inspect(candidate);if(!inspected.ok)continue;
    const body=stripTags(inspected.html||"").toLowerCase(),bodyOverlap=terms.filter(term=>body.includes(term)).length;
    const identityMatch=(playlistUrl&&String(inspected.html||"").includes(playlistUrl))||bodyOverlap>=Math.min(2,terms.length);
@@ -274,7 +275,7 @@ async function main(){
   if(!autoPublicationEnabled)console.log("AUTOPUBLISH_DISABLED: publication policy version 2 is not active; qualified candidates will remain private.");
  }catch(e){autoPublicationEnabled=false;console.log("AUTOPUBLISH_DISABLED: migrations 0028-0029 are not active; discovery will continue without public publication. "+String(e.message||e).slice(0,250));}
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:5};const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:10};const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of activeQueries){
   try{
    const searchResult=await search(item.q,item.region);done++;
