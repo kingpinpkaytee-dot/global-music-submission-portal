@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
- extractSubmissionRoute,extractPlaylistName,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
+ extractSubmissionRoute,extractPlaylistName,parseDataForSeoResults,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
 } from "./opportunity-discovery-core.mjs";
 
 test("extracts a music submission form action",()=>{
@@ -60,4 +60,21 @@ test("rejects unrelated pitch links without music context",()=>{
 
 test("rejects generic listen-on-Spotify labels as playlist names",()=>{
  assert.equal(extractPlaylistName('<a href="https://open.spotify.com/playlist/abc123">Listen on Spotify</a>',"https://open.spotify.com/playlist/abc123","Listen on Spotify"),"");
+});
+
+test("parses only safe organic DataForSEO results and captures task cost",()=>{
+ const parsed=parseDataForSeoResults({
+  status_code:20000,
+  tasks:[{status_code:20000,cost:0.004,result:[{items:[
+   {type:"organic",title:"Publisher page",url:"https://curator.example/playlist",description:"Submit your music"},
+   {type:"paid",title:"Ad",url:"https://ads.example"},
+   {type:"organic",title:"Unsafe",url:"http://127.0.0.1"}
+  ]}]}]
+ });
+ assert.equal(parsed.cost,0.004);
+ assert.equal(parsed.items.length,1);
+ assert.equal(parsed.items[0].url,"https://curator.example/playlist");
+});
+test("rejects failed DataForSEO task responses",()=>{
+ assert.throws(()=>parseDataForSeoResults({status_code:20000,tasks:[{status_code:40000,status_message:"failed"}]}),/not successful/);
 });
