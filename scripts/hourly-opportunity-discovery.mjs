@@ -380,7 +380,7 @@ async function main(){
       independent_corroboration:true,independent_source_reachable:true,independent_identity_match:true,independent_category_match:true,
       independent_source_url:corroboration.url,independent_source_host:corroboration.host,independent_source_domain:corroboration.domain,
       primary_source_host:hostnameOf(finalUrl),primary_source_domain:registrableDomain(finalUrl),
-      metrics_source_url:profileEvidence.profileUrl||finalUrl,
+      metrics_source_url:profileEvidence.profileUrl||finalUrl,metrics_source_domain:registrableDomain(profileEvidence.profileUrl||finalUrl),
       individual_playlist_url:ev.playlistUrl,submission_route_url:ev.submissionUrl,
       follower_count:followerCount,response_rate:responseRate,activity_status:activityStatus,
       verified_at:now(),verification_method:"deterministic checklist: live publisher page, explicit HTTPS submission route, individual Spotify playlist, >100 followers, active status, 0.5-100% response rate, and an independently reachable second domain matching the same playlist identity"
