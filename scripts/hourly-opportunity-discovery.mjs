@@ -1,4 +1,4 @@
-import { extractSubmissionRoute, extractPlaylistName, parseSearchRss, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
+import { extractSubmissionRoute, extractPlaylistName, parseSearchRss, isRestrictedAutomationSource, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
 
 // Global music-opportunity discovery for Artist Frequency.
 // Discovery backlog target: build toward 18,000+ researched candidates over time; this is a target, not a forecast or verified count.
@@ -26,43 +26,26 @@ const playlistRegions=[
 // Qualification: strictly more than 100 followers, explicitly active, response rate 0.5%-100%.
 const playlistQueries=playlistRegions.map(region=>({
  category:"playlist",region,
- q:`("Spotify playlist" OR "Spotify curator") ("followers" OR "response rate") "${region}" active curator -jobs -definition`
+ q:`("Spotify playlist curator" OR "submit your music") ("followers" OR "response rate" OR "submission form") "${region}" active -jobs -definition -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com -site:playlist.com`
 }));
 const platformPlaylistQueries=[
- {category:"playlist",dsp:"Spotify",q:'"open.spotify.com/playlist" "playlist curator" ("submit music" OR "submission")'},
- {category:"playlist",dsp:"SubmitHub",q:'"submithub.com" curator playlist "response rate" followers active'},
- {category:"playlist",dsp:"Pitchplaylists",q:'"pitchplaylists.com" playlist curator followers active response'},
- {category:"playlist",dsp:"Daily Playlists",q:'"dailyplaylists.com" playlist curator followers active response rate'},
- {category:"playlist",dsp:"Groover",q:'"groover.co" playlist curator "response rate" active followers'},
- {category:"playlist",dsp:"SubmitLink",q:'"submitlink.io" playlist curator followers response rate active'},
- {category:"playlist",dsp:"PlaylistSupply",q:'playlist curator database "response rate" followers active'},
- {category:"playlist",dsp:"Global playlist curators",q:'music playlist curator "response rate" "followers" active submission'},
- {category:"playlist",dsp:"SubmitLink profiles",q:'"submitlink.io/c/" "followers" "response rate" playlist curator'},
- {category:"playlist",dsp:"SubmitLink profiles",q:'"submitlink.io/c/" "Spotify playlist" curator followers'},
- {category:"playlist",dsp:"SubmitHub curator profiles",q:'"submithub.com/curators" "response rate" playlist'},
- {category:"playlist",dsp:"SubmitHub curator profiles",q:'"submithub.com" "curator" "responds to" playlist music'},
- {category:"playlist",dsp:"Groover curator profiles",q:'"groover.co" "response rate" playlist curator'},
- {category:"playlist",dsp:"Groover curator profiles",q:'"groover.co" "active" "playlist" curator music'},
- {category:"playlist",dsp:"Daily Playlists curator profiles",q:'"dailyplaylists.com" curator playlist followers active'},
- {category:"playlist",dsp:"Pitchplaylists curator profiles",q:'"pitchplaylists.com" playlist curator "followers"'},
- {category:"playlist",dsp:"Soundplate playlist submissions",q:'"soundplate.com" playlist submit music curator Spotify playlist'},
- {category:"playlist",dsp:"Playlist curator profiles",q:'"response rate" "Spotify playlist" curator "followers"'},
- {category:"playlist",dsp:"Playlist curator profiles",q:'"responds to" "playlist submissions" Spotify curator'},
- {category:"playlist",dsp:"Playlist curator profiles",q:'"last active" playlist curator music submission followers'},
- {category:"playlist",dsp:"Playlist curator profiles",q:'"active curator" "response rate" music playlist submit'},
- {category:"playlist",dsp:"SubmitLink curator profiles",q:'"submitlink.io/c/" "Spotify" "followers" ("response rate" OR "responds to")'},
- {category:"playlist",dsp:"SubmitLink curator profiles",q:'"submitlink.io/c/" "followers" "active" playlist'},
- {category:"playlist",dsp:"SubmitLink curator profiles",q:'"submitlink.io/c/" "open.spotify.com/playlist" curator'},
- {category:"playlist",dsp:"SubmitHub curator profiles",q:'"submithub.com/curators" "response rate" "followers" Spotify'},
- {category:"playlist",dsp:"SubmitHub curator profiles",q:'"submithub.com" "responds to" "playlist" "Spotify" curator'},
- {category:"playlist",dsp:"Groover curator profiles",q:'"groover.co" "response rate" "followers" playlist curator'},
- {category:"playlist",dsp:"Daily Playlists curator profiles",q:'"dailyplaylists.com" "Spotify playlist" "curator" "followers"'},
- {category:"playlist",dsp:"Pitchplaylists curator profiles",q:'"pitchplaylists.com" "Spotify playlist" "followers" curator'}
+ {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist curator" "submission form" "followers" "response rate" -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
+ {category:"playlist",dsp:"Independent curator profiles",q:'"submit your music" "Spotify playlist" curator "followers" active -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
+ {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist" curator "response rate" "last active" -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
+ {category:"playlist",dsp:"Independent curator profiles",q:'"Playlist Followers" "Response Rate" Spotify playlist submissions curator -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
+ {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlists" "submit music" "followers" "active curator" -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
+ {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist submission" "response within" curator profile -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
+ {category:"playlist",dsp:"Daily Playlists profiles",q:'site:dailyplaylists.com Spotify playlist curator followers submission active'},
+ {category:"playlist",dsp:"Pitchplaylists profiles",q:'site:pitchplaylists.com Spotify playlist curator followers submissions'},
+ {category:"playlist",dsp:"Groover profiles",q:'site:groover.co Spotify playlist curator "response rate" active'},
+ {category:"playlist",dsp:"Playlist curator websites",q:'"Spotify playlist curator" "submit music" "contact" followers active independent'},
+ {category:"playlist",dsp:"Playlist curator websites",q:'"Spotify playlist" curator "submission" "followers" "genres" music'},
+ {category:"playlist",dsp:"Playlist curator websites",q:'"playlist pitch" Spotify curator active submissions followers'}
 ];
-const queries=[...playlistQueries,...platformPlaylistQueries];
-const queryRotationIndex=Math.floor(Date.now()/3600000)%queries.length;
+const queries=Array.from({length:Math.max(playlistQueries.length,platformPlaylistQueries.length)},(_,i)=>[playlistQueries[i],platformPlaylistQueries[i]].filter(Boolean)).flat();
 const requestedSearches=Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1);
 const searchesPerRun=Number.isFinite(requestedSearches)?Math.max(1,Math.min(2,requestedSearches)):1;
+const queryRotationIndex=(Math.floor(Date.now()/3600000)*searchesPerRun)%queries.length;
 const activeQueries=Array.from({length:searchesPerRun},(_,i)=>queries[(queryRotationIndex+i)%queries.length]);
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
@@ -316,10 +299,14 @@ async function main(){
      rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Unsafe or non-public destination blocked"});
      rejected++;continue;
     }
-    // Reject obvious dictionary/search-noise destinations before spending a page fetch.
-    const noiseHosts=["dictionary.cambridge.org","cambridge.org","merriam-webster.com","vocabulary.com","thefreedictionary.com","dictionary.com","submittable.com"];
+    // Respect published source restrictions and reject obvious generic landing-page noise before fetching.
+    if(isRestrictedAutomationSource(url)){
+     rejectedDetails.push({category:item.category,name:"Excluded source",url,provider:hit.provider||"unknown",evidenceReason:"Source terms restrict automated data collection, scraping or non-US use; no page content collected"});
+     rejected++;continue;
+    }
+    const noiseHosts=["dictionary.cambridge.org","cambridge.org","merriam-webster.com","vocabulary.com","thefreedictionary.com","dictionary.com","submittable.com","facebook.com","instagram.com","youtube.com","accounts.spotify.com","artists.spotify.com","spotify.com","spotify.app.link"];
     if(noiseHosts.some(domain=>urlHost===domain||urlHost.endsWith("."+domain))){
-     rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Excluded known dictionary or unrelated submission-platform noise"});
+     rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Excluded generic search-noise, social or streaming-service landing page"});
      rejected++;continue;
     }
     let page;
