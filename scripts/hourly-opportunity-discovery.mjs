@@ -1,7 +1,7 @@
-import { extractSubmissionRoute, extractPlaylistName, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
+import { extractSubmissionRoute, extractPlaylistName, parseDataForSeoResults, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
 
 // Global music-opportunity discovery for Artist Frequency.
-// Public playlist discovery target: 18,000+ unique opportunities over time.
+// Discovery backlog target: build toward 18,000+ researched candidates over time; this is a target, not a forecast or verified count.
 // The target is a research backlog goal, NOT a claim about Spotify's playlist count.
 // Auto-publication remains gated by fresh publisher-page evidence AND independent
 // second-source corroboration. Published listings never enable in-platform submissions.
@@ -89,14 +89,9 @@ async function search(q,locationName){
  });
  const raw=await response.text();
  if(!response.ok)throw new Error("DataForSEO HTTP "+response.status+": "+raw.slice(0,350));
- const data=JSON.parse(raw);
- if(data.status_code!==20000||!Array.isArray(data.tasks)||data.tasks[0]?.status_code!==20000||!Array.isArray(data.tasks[0]?.result))
-  throw new Error("DataForSEO task failed: "+String(data.tasks?.[0]?.status_message||data.status_message||"No SERP results").slice(0,350));
- const task=data.tasks[0];
- const items=task.result.flatMap(group=>group.items||[])
-  .filter(item=>item.type==="organic"&&isSafePublicHttpUrl(item.url))
-  .map(item=>({title:String(item.title||""),link:String(item.url||""),snippet:String(item.description||""),provider:"DataForSEO Google Organic",publisherUrl:null,pageAge:item.timestamp||null}));
- return {items,providerStats:{"DataForSEO Google Organic":{count:items.length,cost:Number(task.cost||data.cost||0),statusCode:task.status_code,error:null}}};
+ const parsed=parseDataForSeoResults(JSON.parse(raw));
+ const items=parsed.items.map(item=>({...item,link:item.url,snippet:item.description,provider:"DataForSEO Google Organic",publisherUrl:null}));
+ return {items,providerStats:{"DataForSEO Google Organic":{count:items.length,cost:parsed.cost,statusCode:parsed.statusCode,error:null}}};
 }
 async function readLimitedText(response,maxBytes=250000){
  const reader=response.body?.getReader();if(!reader)return "";
