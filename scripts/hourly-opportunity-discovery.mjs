@@ -28,15 +28,10 @@ const playlistRegions=[
 // Qualification: strictly more than 100 followers, explicitly active, response rate 0.5%-100%.
 const playlistQueries=playlistRegions.slice(0,18).map(region=>({
  category:"playlist",region,
- q:`("music playlist" OR "Spotify playlist" OR "Apple Music playlist" OR "YouTube playlist") ("followers" OR "response rate") "${region}" active curator -jobs -definition`
+ q:`("Spotify playlist" OR "Spotify curator") ("followers" OR "response rate") "${region}" active curator -jobs -definition`
 }));
 const platformPlaylistQueries=[
  {category:"playlist",dsp:"Spotify",q:'site:open.spotify.com/playlist "playlist curator" ("submit music" OR "submission")'},
- {category:"playlist",dsp:"YouTube",q:'site:youtube.com/playlist ("music curator" OR "submit music" OR "playlist submission")'},
- {category:"playlist",dsp:"YouTube Music",q:'site:music.youtube.com/playlist ("curator" OR "submit music" OR "playlist submission")'},
- {category:"playlist",dsp:"Apple Music",q:'site:music.apple.com "playlist" ("submit music" OR "curator" OR "music submission")'},
- {category:"playlist",dsp:"Deezer",q:'site:deezer.com/playlist ("curator" OR "submit music" OR "playlist submission")'},
- {category:"playlist",dsp:"Tidal",q:'site:tidal.com/browse/playlist ("curator" OR "submit music" OR "playlist submission")'},
  {category:"playlist",dsp:"SubmitHub",q:'site:submithub.com curator playlist "response rate" followers active'},
  {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com playlist curator followers active response'},
  {category:"playlist",dsp:"Daily Playlists",q:'site:dailyplaylists.com playlist curator followers active response rate'},
@@ -252,16 +247,19 @@ function evidence(category,title,snippet,html,url,routeOverride=null){
  if(category==="platform"&&!/(music|playlist|radio|blog|curator|artist)/i.test(page))return {ok:false,reason:"No music-submission platform identity on inspected page"};
  return {ok:true,directPageEvidence:true,routeFound:true,submissionUrl:route.url,submissionMethod:route.method,categoryMatch:true};
 }
-async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl,dspName,hits){
+async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl,dspName,hits,budget){
  const primaryHost=hostnameOf(primaryUrl),primaryDomain=registrableDomain(primaryUrl);
  const terms=String(name||"").toLowerCase().split(/[^a-z0-9]+/i).filter(x=>x.length>3&&!["playlist","music","official","curated","best","with","from","that"].includes(x)).slice(0,6);
  if(!primaryHost||!primaryDomain||!terms.length)return {ok:false,reason:"Insufficient identity terms for independent corroboration"};
+ if(!budget||budget.remaining<=0)return {ok:false,reason:"Per-run independent inspection budget exhausted"};
  for(const hit of (hits||[]).slice(0,20)){
   const candidate=hit.link,host=hostnameOf(candidate),domain=registrableDomain(candidate);
   if(!host||!isSafePublicHttpUrl(candidate)||!domain||domain===primaryDomain||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
   const searchable=(String(hit.title||"")+" "+String(hit.snippet||"")).toLowerCase();
   const overlap=terms.filter(term=>searchable.includes(term)).length;
   if((playlistUrl&&searchable.includes(playlistUrl.toLowerCase()))||overlap>=Math.min(2,terms.length)){
+   if(budget.remaining<=0)break;
+   budget.remaining--;
    const inspected=await inspect(candidate);if(!inspected.ok)continue;
    const body=stripTags(inspected.html||"").toLowerCase(),bodyOverlap=terms.filter(term=>body.includes(term)).length;
    const identityMatch=(playlistUrl&&String(inspected.html||"").includes(playlistUrl))||bodyOverlap>=Math.min(2,terms.length);
@@ -280,13 +278,13 @@ async function main(){
   if(!autoPublicationEnabled)console.log("AUTOPUBLISH_DISABLED: publication policy version 2 is not active; qualified candidates will remain private.");
  }catch(e){autoPublicationEnabled=false;console.log("AUTOPUBLISH_DISABLED: migrations 0028-0029 are not active; discovery will continue without public publication. "+String(e.message||e).slice(0,250));}
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:5};const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of activeQueries){
   try{
    const searchResult=await search(item.q,item.region);done++;
    for(const [provider,stats] of Object.entries(searchResult.providerStats||{})){
-    providerStats[provider]??={queries:0,results:0,failures:0};
-    providerStats[provider].queries++;providerStats[provider].results+=stats.count||0;
+    providerStats[provider]??={queries:0,results:0,failures:0,costUsd:0};
+    providerStats[provider].queries++;providerStats[provider].results+=stats.count||0;providerStats[provider].costUsd=Number((providerStats[provider].costUsd+(stats.cost||0)).toFixed(6));
     if(stats.error){providerStats[provider].failures++;providerDiagnostics[provider]??=[];providerDiagnostics[provider].push({query:item.q,error:stats.error});}
    }
    for(const hit of searchResult.items){
@@ -362,7 +360,7 @@ async function main(){
      rejectedDetails.push({category:"playlist",name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:qualification.failures.join("; "),followerCount,responseRate,activityStatus,submissionUrl:ev.submissionUrl});
      rejected++;continue;
     }
-    corroboration=await findIndependentCorroboration(item.category,name,finalUrl,ev.playlistUrl||null,ev.dspName||item.dsp||null,searchResult.items);
+    corroboration=await findIndependentCorroboration(item.category,name,finalUrl,ev.playlistUrl||null,ev.dspName||item.dsp||null,searchResult.items,corroborationBudget);
     const existing=await rest("opportunity_discovery_candidates?select=id,name,category,source_url,website_url,submission_url,review_status,activity_status,follower_count,response_rate&category=eq.playlist&source_url=eq."+encodeURIComponent(finalUrl)+"&limit=1");
     if(existing&&existing.length){duplicates++;duplicateDetails.push(existing[0]);continue;}
     await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
@@ -410,7 +408,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"DataForSEO Google Organic",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"DataForSEO Google Organic",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
