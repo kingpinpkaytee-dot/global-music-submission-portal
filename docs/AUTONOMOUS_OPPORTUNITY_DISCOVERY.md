@@ -80,8 +80,10 @@ Do not apply migrations blindly if the production migration history is inconsist
 
 The workflow automatically runs the built-in Node test suite before any search request. The tests cover:
 
+- DataForSEO response parsing and paid/unsafe-result rejection;
+- playlist-name extraction from the exact Spotify link;
 - direct form and portal route extraction;
-- newsletter-form rejection;
+- newsletter-form and unrelated-link rejection;
 - registrable-domain comparison;
 - unsafe URL and IP-literal blocking;
 - follower, activity, response-rate and HTTPS-route thresholds;
