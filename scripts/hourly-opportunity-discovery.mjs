@@ -284,40 +284,60 @@ async function resolveGoogleNewsPublisher(hit){
  const title=cleanName(hit.title);if(!title)return null;
  const publisherHost=hostnameOf(hit.publisherUrl);
  const terms=title.toLowerCase().split(/\s+/).filter(x=>x.length>3).slice(0,6);
- // Google News RSS article tokens are opaque protobuf IDs, not reliably
- // base64-encoded destination URLs. Try the browser article route first.
- try{
-  const match=String(hit.link||"").match(/\/rss\/articles\/([^?]+)/i);
-  if(match){
-   const articleUrl="https://news.google.com/articles/"+match[1];
-   const page=await inspect(articleUrl);
-   const finalHost=hostnameOf(page.finalUrl||"");
-   if(page.ok&&finalHost&&finalHost!=="news.google.com"&&!finalHost.endsWith(".news.google.com")){
-    const body=stripTags(page.html||"").toLowerCase();
-    const titleMatch=!terms.length||terms.filter(t=>body.includes(t)).length>=Math.min(2,terms.length);
-    if(titleMatch)return page.finalUrl;
-   }
-   if(page.ok){
-    const html=String(page.html||"");
-    const canonical=html.match(/<link[^>]+rel=["'](?:canonical|alternate)["'][^>]+href=["']([^"']+)["']/i)||html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
-    if(canonical){
-     const target=new URL(decodeHtml(canonical[1]),page.finalUrl||articleUrl);
-     const host=hostnameOf(target.toString());
-     if(host&&host!=="news.google.com"&&!host.endsWith(".news.google.com"))return target.toString();
-    }
-   }
+ const match=String(hit.link||"").match(/\/(?:rss\/)?articles\/([^?]+)/i);
+ if(match){
+  const articleId=match[1];
+  // Current Google News RSS IDs are opaque. Resolve through the article-page
+  // signature and batchexecute RPC rather than treating redirects as URLs.
+  for(const path of ["/rss/articles/","/articles/"]){
+   try{
+    const articleUrl="https://news.google.com"+path+articleId;
+    const page=await fetch(articleUrl,{redirect:"follow",signal:AbortSignal.timeout(12000),headers:{
+     "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+     "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+     "Accept-Language":"en-US,en;q=0.9","Cookie":"CONSENT=PENDING+987","Upgrade-Insecure-Requests":"1"
+    }});
+    if(!page.ok)continue;
+    const html=await page.text();
+    const sigMatch=html.match(/data-n-a-sg=["']([^"']+)["']/i);
+    const tsMatch=html.match(/data-n-a-ts=["'](\d+)["']/i);
+    if(!sigMatch||!tsMatch)continue;
+    const inner=JSON.stringify(["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],articleId,Number(tsMatch[1]),sigMatch[1]]);
+    const outer=JSON.stringify([[["Fbv4je",inner]]]);
+    const response=await fetch("https://news.google.com/_/DotsSplashUi/data/batchexecute",{method:"POST",redirect:"follow",signal:AbortSignal.timeout(12000),headers:{
+     "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Origin":"https://news.google.com","Referer":"https://news.google.com/","X-Same-Domain":"1",
+     "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+     "Accept":"*/*","Cookie":"CONSENT=PENDING+987"
+    },body:"f.req="+encodeURIComponent(outer)});
+    if(!response.ok)continue;
+    const raw=await response.text();
+    const split=raw.indexOf("\n\n");
+    const payloadText=split>=0?raw.slice(split+2):raw.replace(/^\)\]\}'[^\n]*\n?/,"");
+    let frames;try{frames=JSON.parse(payloadText);}catch{continue;}
+    const frame=Array.isArray(frames)?frames.find(x=>Array.isArray(x)&&x[0]==="wrb.fr"&&x[1]==="Fbv4je"):null;
+    if(!frame||typeof frame[2]!=="string")continue;
+    let decoded;try{decoded=JSON.parse(frame[2]);}catch{continue;}
+    const destination=Array.isArray(decoded)&&decoded[0]==="garturlres"?decoded[1]:null;
+    if(!destination)continue;
+    try{
+     const target=new URL(destination),host=hostnameOf(destination);
+     if(!/^https?:$/.test(target.protocol)||!host||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
+     return target.toString();
+    }catch{}
+   }catch{}
   }
- }catch{}
+ }
+ // Retain exact-headline search as a fallback; publisher-scoped results must
+ // remain on the publisher's RSS source domain.
  for(const scoped of [true,false]){
   try{
    const u=new URL("https://www.bing.com/search");u.searchParams.set("format","rss");
-   u.searchParams.set("q",'"'+title.replace(/["']/g," ")+'"'+(scoped&&publisherHost?' site:'+publisherHost:""));
+   u.searchParams.set("q",'"'+title.replace(/["']/g," ")+'"'+(scoped&&publisherHost?" site:"+publisherHost:""));
    u.searchParams.set("count","10");
    const results=await fetchFeed(u,scoped?"Bing publisher-headline resolution":"Bing exact-headline resolution");
    for(const item of results.slice(0,10)){
-    const candidate=item.link;let parsed;try{parsed=new URL(candidate);}catch{continue;}
-    const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
-    if(host==="news.google.com"||host.endsWith(".news.google.com")||host==="bing.com"||host.endsWith(".bing.com"))continue;
+    const candidate=item.link,host=hostnameOf(candidate);
+    if(!host||host==="news.google.com"||host.endsWith(".news.google.com")||host==="bing.com"||host.endsWith(".bing.com"))continue;
     if(scoped&&publisherHost&&host!==publisherHost)continue;
     const overlap=terms.filter(t=>(item.title||"").toLowerCase().includes(t)).length;
     if(overlap<Math.min(2,terms.length))continue;
@@ -327,14 +347,6 @@ async function resolveGoogleNewsPublisher(hit){
    }
   }catch{}
  }
- try{
-  const page=await inspect(hit.link);
-  if(page.ok){
-   const html=String(page.html||"");
-   const canonical=html.match(/<link[^>]+rel=["'](?:canonical|alternate)["'][^>]+href=["']([^"']+)["']/i)||html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
-   if(canonical){const target=new URL(decodeHtml(canonical[1]),page.finalUrl||hit.link);if(!/(^|\.)news\.google\.com$/i.test(target.hostname))return target.toString();}
-  }
- }catch{}
  return null;
 }
 async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl,dspName){
