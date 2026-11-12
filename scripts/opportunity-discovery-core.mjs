@@ -6,6 +6,34 @@ const MULTI_LABEL_SUFFIXES=new Set([
 const BLOCKED_HOSTS=new Set(["localhost","metadata.google.internal","metadata.google","instance-data"]);
 function stripTags(s){return String(s||"").replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/\s+/g," ").trim();}
 
+function decodeXml(value){
+ return String(value||"")
+  .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1")
+  .replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&apos;|&#39;/g,"'")
+  .replace(/&lt;/g,"<").replace(/&gt;/g,">")
+  .replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)))
+  .replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
+}
+
+export function parseGoogleNewsRss(xml){
+ const source=String(xml||"");
+ const items=[];
+ for(const match of source.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
+  const block=match[1];
+  const read=name=>{
+   const open="<"+name+">",close="</"+name+">";
+   const start=block.toLowerCase().indexOf(open.toLowerCase());
+   if(start<0)return "";
+   const end=block.toLowerCase().indexOf(close.toLowerCase(),start+open.length);
+   return end<0?"":decodeXml(block.slice(start+open.length,end).trim());
+  };
+  const title=read("title"),url=read("link"),description=read("description");
+  const publishedAt=read("pubDate")||null;
+  if(title&&isSafePublicHttpUrl(url))items.push({title,url,description,publishedAt});
+ }
+ return items;
+}
+
 export function hostnameOf(value){
  try{return new URL(value).hostname.toLowerCase().replace(/^\[|\]$/g,"").replace(/^www\./,"");}
  catch{return "";}
