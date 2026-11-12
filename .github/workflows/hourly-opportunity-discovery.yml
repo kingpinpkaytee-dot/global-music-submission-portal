@@ -33,5 +33,5 @@ jobs:
         env:
           SUPABASE_URL: https://mdcvewnevgsgmyfnybgn.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          DISCOVERY_SEARCHES_PER_RUN: "1"
+          DISCOVERY_SEARCHES_PER_RUN: "2"
         run: node scripts/hourly-opportunity-discovery.mjs
