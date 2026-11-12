@@ -22,11 +22,11 @@ const playlistRegions=[
  "United Kingdom","United States","Canada","Brazil","Mexico","Argentina",
  "Germany","France","Netherlands","Sweden","Spain","Italy",
  "India","Japan","South Korea","Australia","New Zealand",
- "Jamaica","Trinidad and Tobago","France","Portugal","Poland"
+ "Jamaica","Trinidad and Tobago","Portugal","Poland"
 ];
 // Playlist-only discovery: all genres, worldwide, across major DSPs and curator platforms.
 // Qualification: strictly more than 100 followers, explicitly active, response rate 0.5%-100%.
-const playlistQueries=playlistRegions.slice(0,18).map(region=>({
+const playlistQueries=playlistRegions.map(region=>({
  category:"playlist",region,
  q:`("Spotify playlist" OR "Spotify curator") ("followers" OR "response rate") "${region}" active curator -jobs -definition`
 }));
@@ -63,7 +63,8 @@ const platformPlaylistQueries=[
 ];
 const queries=[...playlistQueries,...platformPlaylistQueries];
 const queryRotationIndex=Math.floor(Date.now()/3600000)%queries.length;
-const searchesPerRun=Math.max(1,Math.min(2,Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1)));
+const requestedSearches=Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1);
+const searchesPerRun=Number.isFinite(requestedSearches)?Math.max(1,Math.min(2,requestedSearches)):1;
 const activeQueries=Array.from({length:searchesPerRun},(_,i)=>queries[(queryRotationIndex+i)%queries.length]);
 const now=()=>new Date().toISOString();
 async function request(url,options={},label="request"){
@@ -409,7 +410,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"DataForSEO Google Organic",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"DataForSEO Google Organic",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
