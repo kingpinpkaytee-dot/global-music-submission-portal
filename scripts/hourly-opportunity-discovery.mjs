@@ -1,4 +1,4 @@
-import { extractSubmissionRoute, extractPlaylistName, parseGoogleNewsRss, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
+import { extractSubmissionRoute, extractPlaylistName, parseSearchRss, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
 
 // Global music-opportunity discovery for Artist Frequency.
 // Discovery backlog target: build toward 18,000+ researched candidates over time; this is a target, not a forecast or verified count.
@@ -78,16 +78,38 @@ function decodeHtml(s){
  return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
 function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\s+/g," ").trim();}
-async function search(q,locationName){
- const regionCodes={"South Africa":"ZA","Nigeria":"NG","Ghana":"GH","Kenya":"KE","Tanzania":"TZ","Uganda":"UG","United Kingdom":"GB","United States":"US","Canada":"CA","Brazil":"BR","Mexico":"MX","Argentina":"AR","Germany":"DE","France":"FR","Netherlands":"NL","Sweden":"SE","Spain":"ES","Italy":"IT","India":"IN","Japan":"JP","South Korea":"KR","Australia":"AU","New Zealand":"NZ","Jamaica":"JM","Trinidad and Tobago":"TT","Portugal":"PT","Poland":"PL"};
- const country=regionCodes[locationName]||"ZA";
- const params=new URLSearchParams({q,hl:"en-US",gl:country,ceid:country+":en"});
- const endpoint="https://news.google.com/rss/search?"+params.toString();
- const response=await fetch(endpoint,{headers:{"User-Agent":"ArtistFrequencyOpportunityResearch/2.1","Accept":"application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.5"},signal:AbortSignal.timeout(20000)});
+function resolveBingRedirect(value){
+ try{
+  const url=new URL(value);
+  if(!/(^|\.)bing\.com$/i.test(url.hostname))return value;
+  const direct=url.searchParams.get("url");
+  if(direct&&isSafePublicHttpUrl(direct))return direct;
+  const encoded=url.searchParams.get("u");
+  if(encoded&&encoded.startsWith("a1")){
+   const decoded=Buffer.from(encoded.slice(2),"base64url").toString("utf8");
+   if(isSafePublicHttpUrl(decoded))return decoded;
+  }
+ }catch{}
+ return value;
+}
+async function search(q){
+ const endpoint=new URL("https://www.bing.com/search");
+ endpoint.searchParams.set("format","rss");
+ endpoint.searchParams.set("q",q);
+ endpoint.searchParams.set("count","20");
+ const response=await fetch(endpoint,{headers:{
+  "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+  "Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.5"
+ },signal:AbortSignal.timeout(20000)});
  const xml=await response.text();
- if(!response.ok)throw new Error("Google News RSS HTTP "+response.status+": "+xml.slice(0,300));
- const items=parseGoogleNewsRss(xml).map(item=>({...item,link:item.url,snippet:item.description,provider:"Google News RSS (free)",publisherUrl:null}));
- return {items,providerStats:{"Google News RSS (free)":{count:items.length,cost:0,statusCode:response.status,error:null}}};
+ if(!response.ok)throw new Error("Bing RSS HTTP "+response.status+": "+xml.slice(0,300));
+ const parsed=parseSearchRss(xml).slice(0,20);
+ const items=parsed.map(item=>({
+  ...item,
+  link:resolveBingRedirect(item.link),
+  provider:"Bing RSS (free)"
+ }));
+ return {items,providerStats:{"Bing RSS (free)":{count:items.length,cost:0,statusCode:response.status,error:null}}};
 }
 async function readLimitedText(response,maxBytes=250000){
  const reader=response.body?.getReader();if(!reader)return "";
@@ -410,7 +432,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||playlistRegions[queryRotationIndex%playlistRegions.length]),searchProvider:"Google News RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||playlistRegions[queryRotationIndex%playlistRegions.length]),searchProvider:"Bing RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
