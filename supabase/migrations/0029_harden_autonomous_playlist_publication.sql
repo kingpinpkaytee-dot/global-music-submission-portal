@@ -74,6 +74,7 @@ BEGIN
      OR candidate.response_rate IS NULL OR candidate.response_rate < 0.5 OR candidate.response_rate > 100
      OR (evidence->>'response_rate')::numeric IS DISTINCT FROM candidate.response_rate
      OR coalesce(evidence->>'metrics_source_url','') !~* '^https://'
+     OR lower(coalesce(evidence->>'metrics_source_domain','')) IS DISTINCT FROM lower(coalesce(evidence->>'primary_source_domain',''))
      OR candidate.auto_verified_at IS NULL
      OR candidate.auto_verified_at < now() - interval '6 hours'
      OR candidate.last_checked_at IS NULL
@@ -81,6 +82,7 @@ BEGIN
      OR candidate.source_url IS NULL OR candidate.evidence_url IS NULL OR candidate.submission_url IS NULL
      OR candidate.source_url !~* '^https://'
      OR candidate.evidence_url !~* '^https://'
+     OR candidate.evidence_url IS DISTINCT FROM candidate.source_url
      OR candidate.submission_url !~* '^https://'
      OR candidate.website_url !~* '^https://open[.]spotify[.]com/playlist/[A-Za-z0-9]+([/?#].*)?$'
      OR lower(candidate.source_url) LIKE '%news.google.com%'
@@ -101,7 +103,7 @@ BEGIN
   END IF;
 
   -- Serialize duplicate checks for the same public playlist before insertion.
-  PERFORM pg_advisory_xact_lock(hashtextextended(lower(candidate.website_url), 0));
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(lower(candidate.website_url), 0));
 
   SELECT id INTO saved_id
   FROM public.opportunity_directories
