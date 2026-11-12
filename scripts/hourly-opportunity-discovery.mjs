@@ -315,7 +315,7 @@ async function main(){
     const metricHtml=(profileEvidence.html||"")+" "+(page.html||"");
     const route=extractSubmissionRoute(page.html||"",page.finalUrl||url)
       ||(profileEvidence.html?extractSubmissionRoute(profileEvidence.html,profileEvidence.profileUrl):null);
-    const publisherTitle=extractPageTitle(page.html||"");
+    const publisherTitle=extractPageTitle(page.html||"")||extractPageTitle(profileEvidence.html||"");
     if(!publisherTitle){rejectedDetails.push({category:item.category,name:"Unidentified publisher page",url:page.finalUrl||url,provider:hit.provider||"unknown",evidenceReason:"Publisher page did not expose its own title"});rejected++;continue;}
     const ev=evidence(item.category,publisherTitle,"",metricHtml,page.finalUrl||url,route);
     const name=cleanName(extractPlaylistName(metricHtml,ev.playlistUrl,publisherTitle));
@@ -344,7 +344,7 @@ async function main(){
      // avoids treating unqualified search results as candidate records.
      rejected++;continue;
     }
-    const html=page.html||"",email=extractEmail(html);
+    const html=page.html||"",email=extractEmail(metricHtml);
     const lowerText=(name+" "+metricHtml.slice(0,50000)).toLowerCase();
     const knownGenres=["Amapiano","Afro House","Afrobeats","Afrobeat","Deep House","Melodic House","Organic House","Hip Hop","Rap","R&B","Soul","Funk","Jazz","Blues","Rock","Alternative","Indie","Pop","Dance","EDM","House","Tech House","Progressive House","Techno","Trance","Drum and Bass","Dubstep","Garage","Disco","Reggae","Dancehall","Gospel","Christian","Classical","Country","Folk","Metal","Punk","Latin","Reggaeton","K-Pop","J-Pop","Ambient","Downtempo","Chillout","World Music"];
     const extractedGenres=knownGenres.filter(g=>lowerText.includes(g.toLowerCase()));
