@@ -322,7 +322,7 @@ async function main(){
     if(!name){rejectedDetails.push({category:"playlist",name:"Unidentified Spotify playlist",url:page.finalUrl||url,provider:hit.provider||"unknown",evidenceReason:"Publisher page did not expose a specific playlist name"});rejected++;continue;}
     const finalUrl=page.finalUrl||url;
     let corroboration={ok:false,reason:"Primary publisher-page checks did not pass"};
-    const searchable=(name+" "+(page.html||"").slice(0,30000)).toLowerCase();
+    const searchable=(name+" "+metricHtml.slice(0,30000)).toLowerCase();
     let host="",path="";
     try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\./,"");path=parsed.pathname.toLowerCase();}catch{}
     const genericRadioDirectories=["iheart.com","accuradio.com","radio.net","mytuner-radio.com","appradiofm.com","tunein.com","radio.garden"];
@@ -345,7 +345,7 @@ async function main(){
      rejected++;continue;
     }
     const html=page.html||"",email=extractEmail(html);
-    const lowerText=(name+" "+html.slice(0,50000)).toLowerCase();
+    const lowerText=(name+" "+metricHtml.slice(0,50000)).toLowerCase();
     const knownGenres=["Amapiano","Afro House","Afrobeats","Afrobeat","Deep House","Melodic House","Organic House","Hip Hop","Rap","R&B","Soul","Funk","Jazz","Blues","Rock","Alternative","Indie","Pop","Dance","EDM","House","Tech House","Progressive House","Techno","Trance","Drum and Bass","Dubstep","Garage","Disco","Reggae","Dancehall","Gospel","Christian","Classical","Country","Folk","Metal","Punk","Latin","Reggaeton","K-Pop","J-Pop","Ambient","Downtempo","Chillout","World Music"];
     const extractedGenres=knownGenres.filter(g=>lowerText.includes(g.toLowerCase()));
     const metrics=extractPlaylistMetrics(metricHtml+" "+name);
