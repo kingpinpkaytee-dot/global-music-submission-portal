@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
- extractSubmissionRoute,extractPlaylistName,parseSearchRss,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
+ extractSubmissionRoute,extractPlaylistName,parseSearchRss,registrableDomain,isSafePublicHttpUrl,isRestrictedAutomationSource,qualifiesPlaylist
 } from "./opportunity-discovery-core.mjs";
 
 test("extracts a music submission form action",()=>{
@@ -25,6 +25,11 @@ test("blocks unsafe, private and non-http destinations",()=>{
   assert.equal(isSafePublicHttpUrl(url),false,url);
  assert.equal(isSafePublicHttpUrl("https://soundplate.com/submit"),true);
 });
+test("blocks automated collection from services whose terms prohibit scraping",()=>{
+ for(const url of ["https://submitlink.io/c/test","https://app.submitlink.io/c/test","https://www.submithub.com/curators","https://soundplate.com/","https://playlist.com/"]) assert.equal(isRestrictedAutomationSource(url),true,url);
+ assert.equal(isRestrictedAutomationSource("https://independentcurator.example/submit"),false);
+});
+
 test("strict playlist gates accept boundary values and all genres",()=>{
  const result=qualifiesPlaylist({
   playlistUrl:"https://open.spotify.com/playlist/5yzND7XsDIzBYIBKu42LJw",
