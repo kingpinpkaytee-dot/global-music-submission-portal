@@ -16,8 +16,10 @@ The worker uses the DataForSEO Google Organic Live Advanced endpoint. It does no
 - 57-query rotating pool: 27 territory searches and 30 Spotify curator/platform searches.
 - Up to 20 organic results per task.
 - The worker stores publisher-page-derived metadata after fetching and checking the actual publisher page. Raw search snippets are used only transiently and are not written into candidate records or run logs.
+- Costly site: search operators are deliberately excluded; they multiply DataForSEO SERP charges.
 - Actual task cost is read from DataForSEO's response and recorded in the Actions log.
-- At the published Live SERP rate of $0.002 per 10 results, a depth of 20 is approximately $0.004 per hourly task, or about $2.88 for 30 days of hourly runs. Actual billing is determined by the returned task cost and current provider pricing.
+- At the Live rate of $0.002 per 10 results, depth 20 is approximately $0.004 per hourly task, or about $2.88 for 30 days of hourly runs. Actual billing is determined by the returned task cost and current provider pricing.
+- DataForSEO currently requires a $50 minimum account top-up for paid use. New accounts have a $1 trial credit; unused balance does not expire. At the estimated run rate, a $50 balance would cover roughly 17 months, subject to actual task cost. The user must authorize and fund the account; the workflow never purchases credits or enables auto-reload.
 
 DataForSEO's terms prohibit using SERP data to compete with or adversely affect the search engine providers. Artist Frequency is a specialized music-opportunity directory, not a general-purpose search engine. Review the current provider terms before activating the API account.
 
