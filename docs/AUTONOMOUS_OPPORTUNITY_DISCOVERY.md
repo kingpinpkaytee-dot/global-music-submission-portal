@@ -10,13 +10,13 @@ This automation publishes opportunity directory records only. It does not submit
 
 ## Search provider and operating cost
 
-The worker has been reverted to Google's public News RSS search endpoint. It requires no paid API, no API account, no card and no DataForSEO credentials. The scheduled worker rotates through the existing 57-query pool and resolves Google News article links to direct publisher pages before inspecting them.
+The hourly worker uses the public Bing Search RSS feed at `https://www.bing.com/search?format=rss`. It requires no API key, no paid account and no prepaid balance. Previous successful discovery runs in this repository recorded hundreds of Bing RSS results. This is an RSS search feed, not the retired Bing Search APIs; Microsoft announced the API retirement effective 11 August 2025.
 
-This is a constrained, zero-search-fee fallback, not a full Google Web Search API. Google News is news-focused, so curator discovery coverage may be narrower and candidate yield may be lower than a general web index. Microsoft retired its public Bing Search APIs on 11 August 2025, so the old Bing Search API is not a valid free fallback. The worker does not scrape Google's Search HTML interface.
+The worker rotates through the existing global territory and curator-platform query pool, unwraps Bing redirect links where possible, and then inspects the destination publisher page. Search titles and snippets are transient inputs. Persisted candidate records are built from the inspected publisher page and verification evidence, not from RSS snippets.
 
-RSS titles, snippets and feed metadata are transient search inputs. The worker persists only metadata extracted from the inspected publisher page and its own verification evidence. A Google News result that cannot be resolved to a direct publisher page is rejected. Provider cost is logged as USD 0; page inspection is limited by the existing runtime and per-run corroboration budgets.
+The RSS endpoint is not a versioned search API and carries no service-level guarantee. Empty feeds, format changes, throttling or provider outages are recorded as run diagnostics. Search provider cost is logged as USD 0. Candidate pages are still subject to safe-URL checks, page-size limits, redirect caps and the per-run corroboration budget.
 
-No paid search provider is configured or called. Do not create DataForSEO credentials or fund a search account while the project is operating in this zero-budget mode.
+Google News RSS has been removed from the automated product pipeline because it is a news-oriented feed, generated empty results for many music-curator queries in prior runs, and routinely returned Google redirect wrappers rather than direct curator pages. No paid search provider is configured.
 
 ## Autonomous playlist publication gates
 
@@ -71,7 +71,7 @@ Do not apply migrations blindly if the production migration history is inconsist
 
 The workflow automatically runs the built-in Node test suite before any search request. The tests cover:
 
-- Google News RSS parsing and unsafe-result rejection;
+- Bing RSS / Atom parsing and unsafe-result rejection;
 - playlist-name extraction from the exact Spotify link;
 - direct form and portal route extraction;
 - newsletter-form and unrelated-link rejection;
