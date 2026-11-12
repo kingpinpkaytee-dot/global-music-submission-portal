@@ -260,11 +260,14 @@ async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl
 
 async function main(){
  let autoPublicationEnabled=true;
- try{await rest("opportunity_discovery_candidates?select=auto_verification&limit=0");}
- catch(e){autoPublicationEnabled=false;console.log("AUTOPUBLISH_DISABLED: database migration 0028 is not active or schema cache is stale; discovery will continue without publishing. "+String(e.message||e).slice(0,250));}
+ try{
+  const policy=await rest("opportunity_discovery_runtime_config?select=publication_policy_version&singleton=eq.true&limit=1");
+  autoPublicationEnabled=Array.isArray(policy)&&policy[0]?.publication_policy_version===2;
+  if(!autoPublicationEnabled)console.log("AUTOPUBLISH_DISABLED: publication policy version 2 is not active; qualified candidates will remain private.");
+ }catch(e){autoPublicationEnabled=false;console.log("AUTOPUBLISH_DISABLED: migrations 0028-0029 are not active; discovery will continue without public publication. "+String(e.message||e).slice(0,250));}
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
  const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
- for(const item of queries){
+ for(const item of activeQueries){
   try{
    const searchResult=await search(item.q);done++;
    for(const [provider,stats] of Object.entries(searchResult.providerStats||{})){
@@ -280,9 +283,11 @@ async function main(){
     if(processedByCategory[item.category]>(item.category==="playlist"?180:12))continue;
     seen++;let url=hit.link;
     if(!url||!/^https?:\/\//i.test(url)){rejected++;continue;}
-    // Follow Google News RSS redirects once; retain only real publisher destinations.
-    let urlHost="";
-    try{urlHost=new URL(url).hostname.toLowerCase();}catch{}
+    let urlHost=hostnameOf(url);
+    if(!isSafePublicHttpUrl(url)){
+     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url,provider:hit.provider||"unknown",evidenceReason:"Unsafe or non-public destination blocked"});
+     rejected++;continue;
+    }
     // Reject obvious dictionary/search-noise destinations before spending a page fetch.
     const noiseHosts=["dictionary.cambridge.org","cambridge.org","merriam-webster.com","vocabulary.com","thefreedictionary.com","dictionary.com","submittable.com"];
     if(noiseHosts.some(domain=>urlHost===domain||urlHost.endsWith("."+domain))){
@@ -290,25 +295,21 @@ async function main(){
      rejected++;continue;
     }
     if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com")){
-     url=googleNewsEmbeddedUrl(url)||await resolveGoogleNewsPublisher(hit);
-     if(!url){
-      rejectedDetails.push({category:item.category,name:cleanName(hit.title),url:hit.link,provider:hit.provider||"unknown",evidenceReason:"Google News article destination could not be independently resolved"});
-      rejected++;continue;
-     }
+     rejectedDetails.push({category:item.category,name:cleanName(hit.title),url:hit.link,provider:hit.provider||"unknown",evidenceReason:"Google News redirect wrappers are excluded; only direct publisher URLs are accepted"});
+     rejected++;continue;
     }
     let page=await inspect(url);
-    if((urlHost==="news.google.com"||urlHost.endsWith(".news.google.com"))&&page.ok){
-     let finalHost="";try{finalHost=new URL(page.finalUrl||url).hostname.toLowerCase();}catch{}
-     if(finalHost==="news.google.com"||finalHost.endsWith(".news.google.com"))page={ok:false,reason:"Google News wrapper did not expose a publisher destination"};
-    }
+
     const profileEvidence=item.category==="playlist"&&page.ok
       ? await inspectCuratorProfileEvidence(page.html||"",page.finalUrl||url)
       : {html:"",profileUrl:null,playlist:null};
     const metricHtml=(profileEvidence.html||"")+" "+(page.html||"");
-    const ev=evidence(item.category,hit.title||"",hit.snippet||"",metricHtml,page.finalUrl||url);
+    const route=extractSubmissionRoute(page.html||"",page.finalUrl||url)
+      ||(profileEvidence.html?extractSubmissionRoute(profileEvidence.html,profileEvidence.profileUrl):null);
+    const ev=evidence(item.category,hit.title||"",hit.snippet||"",metricHtml,page.finalUrl||url,route);
     const name=cleanName(hit.title);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
-    const corroboration=ev.ok?await findIndependentCorroboration(item.category,name,finalUrl,ev.playlistUrl||null,ev.dspName||item.dsp||null):{ok:false,reason:"Primary publisher-page checks did not pass"};
+    let corroboration={ok:false,reason:"Primary publisher-page checks did not pass"};
     const searchable=(name+" "+(hit.snippet||"")+" "+(page.html||"").slice(0,30000)).toLowerCase();
     let host="",path="";
     try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\./,"");path=parsed.pathname.toLowerCase();}catch{}
@@ -340,43 +341,44 @@ async function main(){
     const responseRate=metrics.responseRate;
     const activityStatus=metrics.activityStatus;
     const playlistData=ev.playlistUrl?(" | DSP playlist: "+ev.dspName+" "+ev.playlistUrl+" | Curator profile: "+(profileEvidence.profileUrl||"source page")):"";
-    const failedCriteria=[];
-    if(!ev.playlistUrl)failedCriteria.push("no individual public DSP playlist URL");
-    if(followerCount===null||followerCount<=100)failedCriteria.push("follower count must be greater than 100");
-    if(activityStatus!=="active")failedCriteria.push("active status not explicitly confirmed");
-    if(responseRate===null||responseRate<0.5||responseRate>100)failedCriteria.push("response rate must be between 0.5% and 100%");
-    if(failedCriteria.length){
-     rejectedDetails.push({category:"playlist",name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:failedCriteria.join("; "),followerCount,responseRate,activityStatus,searchSnippet:(hit.snippet||"").slice(0,300)});
+    const qualification=qualifiesPlaylist({playlistUrl:ev.playlistUrl,followerCount,responseRate,activityStatus,submissionUrl:ev.submissionUrl});
+    if(!qualification.ok){
+     rejectedDetails.push({category:"playlist",name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:qualification.failures.join("; "),followerCount,responseRate,activityStatus,submissionUrl:ev.submissionUrl,searchSnippet:(hit.snippet||"").slice(0,300)});
      rejected++;continue;
     }
+    corroboration=await findIndependentCorroboration(item.category,name,finalUrl,ev.playlistUrl||null,ev.dspName||item.dsp||null,searchResult.items);
     const existing=await rest("opportunity_discovery_candidates?select=id,name,category,source_url,website_url,submission_url,review_status,activity_status,follower_count,response_rate&category=eq.playlist&source_url=eq."+encodeURIComponent(finalUrl)+"&limit=1");
     if(existing&&existing.length){duplicates++;duplicateDetails.push(existing[0]);continue;}
     await rest("hourly_opportunity_discovery_candidates?on_conflict=category,destination_url",{
      method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
      body:JSON.stringify({run_id:runId,category:"playlist",name,destination_url:finalUrl,
-      submission_url:ev.ok?finalUrl:null,
+      submission_url:ev.submissionUrl||null,
       evidence:("Title: "+name+playlistData+" | Followers: "+followerCount+" | Response rate: "+responseRate+"% | Activity: "+activityStatus+" | Genres: "+(extractedGenres.join(", ")||"not reliably extracted")+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Submission route: "+(ev.ok?"confirmed":ev.reason||"not confirmed")+" | Independent check: "+(corroboration.ok?"matched":"manual review required")).slice(0,1800),
       verification_status:"pending",
       verification_reason:"Playlist metrics meet configured thresholds; administrator review required"})
     });
     const candidate={category:item.category,name,country:item.region||null,dsp_name:ev.dspName||item.dsp||(item.category==="playlist"?"Spotify":null),
-     genres:extractedGenres,website_url:ev.playlistUrl||finalUrl,submission_url:ev.ok?finalUrl:null,contact_email:email,
-     submission_method:email?"email":(ev.ok?(/mailto:/i.test(html)?"email":"form"):"unknown"),
-     accepts_free_submissions:false,follower_count:followerCount,response_rate:responseRate,
+     genres:extractedGenres,website_url:ev.playlistUrl||finalUrl,submission_url:ev.submissionUrl||null,contact_email:email,
+     submission_method:ev.submissionMethod||(email?"email":"unknown"),
+     accepts_free_submissions:/free\s+(?:music\s+)?submissions?|submit\s+for\s+free/i.test(lowerText),follower_count:followerCount,response_rate:responseRate,
      activity_status:activityStatus,source_name:(hit.provider||"Public Web Search")+(item.dsp?" / "+item.dsp:""),
      source_url:finalUrl,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending",
-     ...(autoPublicationEnabled?{auto_verification:ev.ok&&corroboration.ok?{schema_version:"1",score:98,reachable:true,direct_page_evidence:true,
-      submission_route_found:true,category_match:true,canonical_destination:true,
-      independent_corroboration:true,independent_source_reachable:true,
-      independent_identity_match:true,independent_source_url:corroboration.url,
-      individual_playlist_url:ev.playlistUrl||null,verified_at:now(),
-      verification_method:"live publisher-page inspection plus independent reachable source corroborating playlist identity and category; follower, active-status and response-rate thresholds met"}:null,
-      auto_verified_at:ev.ok&&corroboration.ok?now():null}:{})};
+     ...(autoPublicationEnabled?{auto_verification:ev.ok&&corroboration.ok?{
+      schema_version:"2",score:qualification.score,score_type:"rule_gate_completion",
+      reachable:true,direct_page_evidence:true,submission_route_found:true,category_match:true,canonical_destination:true,
+      independent_corroboration:true,independent_source_reachable:true,independent_identity_match:true,independent_category_match:true,
+      independent_source_url:corroboration.url,independent_source_host:corroboration.host,independent_source_domain:corroboration.domain,
+      primary_source_host:hostnameOf(finalUrl),primary_source_domain:registrableDomain(finalUrl),
+      metrics_source_url:profileEvidence.profileUrl||finalUrl,
+      individual_playlist_url:ev.playlistUrl,submission_route_url:ev.submissionUrl,
+      follower_count:followerCount,response_rate:responseRate,activity_status:activityStatus,
+      verified_at:now(),verification_method:"deterministic checklist: live publisher page, explicit HTTPS submission route, individual Spotify playlist, >100 followers, active status, 0.5-100% response rate, and an independently reachable second domain matching the same playlist identity"
+     }:null,auto_verified_at:ev.ok&&corroboration.ok?now():null}:{})};
     const inserted=await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(candidate)});
     const saved=Array.isArray(inserted)?inserted[0]:null;
     if(!saved?.id)throw new Error("Candidate insert did not return an ID; automatic publication withheld");
     queued++;queuedDetails.push({id:saved.id,category:"playlist",name,source_url:finalUrl,playlist_url:ev.playlistUrl,follower_count:followerCount,response_rate:responseRate,activity_status:activityStatus,genres:extractedGenres,submission_url:candidate.submission_url,contact_email:email,provider:hit.provider||"unknown"});
-    if(ev.ok&&autoPublicationEnabled){
+    if(ev.ok&&corroboration.ok&&autoPublicationEnabled){
      try{
       const publication=await rest("rpc/auto_publish_verified_opportunity_candidate",{method:"POST",body:JSON.stringify({p_candidate_id:saved.id})});
       const result=Array.isArray(publication)?publication[0]:publication;
@@ -392,7 +394,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"Brave Search API",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
