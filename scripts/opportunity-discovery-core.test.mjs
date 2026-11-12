@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
- extractSubmissionRoute,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
+ extractSubmissionRoute,extractPlaylistName,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
 } from "./opportunity-discovery-core.mjs";
 
 test("extracts a music submission form action",()=>{
@@ -45,4 +45,11 @@ test("strict playlist gates reject 100 followers, missing activity, missing resp
 test("strict playlist gates reject response rates outside 0.5-100",()=>{
  for(const rate of [0.49,100.01])
   assert.equal(qualifiesPlaylist({playlistUrl:"https://open.spotify.com/playlist/abc123",followerCount:101,responseRate:rate,activityStatus:"active",submissionUrl:"https://curator.example/submit"}).ok,false);
+});
+
+test("extracts the playlist name from the anchor for its Spotify URL",()=>{
+ assert.equal(extractPlaylistName('<a href="https://open.spotify.com/playlist/abc123">Afro House Dancin</a>',"https://open.spotify.com/playlist/abc123","Submit your music"),"Afro House Dancin");
+});
+test("does not use a generic page heading as a playlist name",()=>{
+ assert.equal(extractPlaylistName("<h1>Submit your music</h1>","https://open.spotify.com/playlist/abc123","Submit your music"),"");
 });
