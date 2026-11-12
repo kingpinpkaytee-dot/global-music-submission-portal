@@ -16,6 +16,8 @@ The worker rotates through the existing global territory and curator-platform qu
 
 The RSS endpoint is not a versioned search API and carries no service-level guarantee. Empty feeds, format changes, throttling or provider outages are recorded as run diagnostics. Search provider cost is logged as USD 0. Candidate pages are still subject to safe-URL checks, page-size limits, redirect caps and the per-run corroboration budget.
 
+The query rotation interleaves territory and independent-curator searches. Two zero-cost RSS queries run per hour by default. Known services that expressly prohibit automated data collection are excluded from page inspection: SubmitLink restricts robots/data mining and states the service is for US use; SubmitHub prohibits automated scraping without prior written consent; Soundplate prohibits scraping/reverse engineering; and Playlist.com prohibits automated access. Those services are not harvested into the directory unless written permission or a licensed feed is obtained.
+
 Google News RSS has been removed from the automated product pipeline because it is a news-oriented feed, generated empty results for many music-curator queries in prior runs, and routinely returned Google redirect wrappers rather than direct curator pages. No paid search provider is configured.
 
 ## Autonomous playlist publication gates
