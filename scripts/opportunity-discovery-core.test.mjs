@@ -63,14 +63,14 @@ test("rejects generic listen-on-Spotify labels as playlist names",()=>{
 });
 
 test("parses safe Google News RSS results, including resolvable wrappers",()=>{
- const parsed=parseGoogleNewsRss(\`<?xml version="1.0"?><rss><channel>
+ const parsed=parseGoogleNewsRss(`<?xml version="1.0"?><rss><channel>
   <item><title><![CDATA[Afro House playlist curator opportunity]]></title>
    <link>https://publisher.example/playlist</link>
    <description><![CDATA[Submit your music]]></description>
    <pubDate>Thu, 12 Nov 2026 00:00:00 GMT</pubDate></item>
   <item><title>Unsafe destination</title><link>http://127.0.0.1/private</link><description>blocked</description></item>
   <item><title>Google News wrapper</title><link>https://news.google.com/rss/articles/abc123</link><description>resolve before inspection</description></item>
- </channel></rss>\`);
+ </channel></rss>`);
  assert.equal(parsed.length,2);
  assert.equal(parsed[0].title,"Afro House playlist curator opportunity");
  assert.equal(parsed[0].url,"https://publisher.example/playlist");
