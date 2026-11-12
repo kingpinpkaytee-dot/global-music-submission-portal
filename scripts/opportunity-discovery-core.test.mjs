@@ -63,13 +63,13 @@ test("rejects generic listen-on-Spotify labels as playlist names",()=>{
 });
 
 test("parses Bing RSS items, snippets and publisher sources while blocking unsafe URLs",()=>{
- const parsed=parseSearchRss(\`<?xml version="1.0"?><rss version="2.0"><channel>
+ const parsed=parseSearchRss(`<?xml version="1.0"?><rss version="2.0"><channel>
   <item><title><![CDATA[Afro House curator submissions]]></title>
    <link>https://www.bing.com/ck/a?url=https%3A%2F%2Fcurator.example%2Fsubmit</link>
    <description><![CDATA[Playlist curator accepting music submissions]]></description>
    <source url="https://curator.example">Curator Journal</source></item>
   <item><title>Unsafe destination</title><link>http://127.0.0.1/private</link><description>blocked</description></item>
- </channel></rss>\`);
+ </channel></rss>`);
  assert.equal(parsed.length,1);
  assert.equal(parsed[0].title,"Afro House curator submissions");
  assert.match(parsed[0].link,/bing\.com/);
@@ -77,12 +77,12 @@ test("parses Bing RSS items, snippets and publisher sources while blocking unsaf
  assert.equal(parsed[0].publisherUrl,"https://curator.example");
 });
 test("parses Atom link attributes and rejects non-public destinations",()=>{
- const parsed=parseSearchRss(\`<feed xmlns="http://www.w3.org/2005/Atom">
+ const parsed=parseSearchRss(`<feed xmlns="http://www.w3.org/2005/Atom">
   <entry><title>Spotify playlist submission page</title>
    <link href="https://curator.example/playlist"/>
    <summary>Active playlist curator</summary></entry>
   <entry><title>Private IP</title><link href="http://192.168.1.1/"/></entry>
- </feed>\`);
+ </feed>`);
  assert.equal(parsed.length,1);
  assert.equal(parsed[0].link,"https://curator.example/playlist");
  assert.equal(parsed[0].snippet,"Active playlist curator");
