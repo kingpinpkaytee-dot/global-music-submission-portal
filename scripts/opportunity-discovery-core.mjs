@@ -66,6 +66,24 @@ export function extractSubmissionRoute(html,baseUrl){
  return null;
 }
 
+
+export function extractPlaylistName(html,playlistUrl,pageTitle=""){
+ const match=String(playlistUrl||"").match(/\/playlist\/([A-Za-z0-9]+)/i);
+ if(!match)return "";
+ const id=match[1];
+ const source=String(html||"").replace(/\\\//g,"/").replace(/\\u002f/gi,"/").replace(/&amp;/g,"&");
+ const anchorPattern=/<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+ for(const anchor of source.matchAll(anchorPattern)){
+  const href=anchor[1].match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1]||"";
+  if(!href.includes(id))continue;
+  const label=stripTags(anchor[2]).replace(/\s*(?:\||–|-)\s*(?:listen on spotify|spotify|listen now)\s*$/i,"").trim();
+  if(label.length>=4&&!/^(spotify|listen|listen now|playlist|music playlist|submit music|submit your music|music submission)$/i.test(label))return label.slice(0,160);
+ }
+ const fallback=stripTags(String(pageTitle||"")).replace(/\s*(?:\||–|-)\s*(?:submit music|submit your music|music submission|submit here|listen on spotify|spotify)\s*$/i,"").trim();
+ if(fallback.length>=4&&!/^(spotify|listen|listen now|playlist|music playlist|submit music|submit your music|music submission)$/i.test(fallback))return fallback.slice(0,160);
+ return "";
+}
+
 export function qualifiesPlaylist({playlistUrl,followerCount,responseRate,activityStatus,submissionUrl}){
  const failures=[];
  if(!/^https:\/\/open\.spotify\.com\/playlist\/[A-Za-z0-9]+(?:[/?#].*)?$/i.test(String(playlistUrl||"")))failures.push("individual public Spotify playlist URL missing");
