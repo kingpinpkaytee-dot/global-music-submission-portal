@@ -83,7 +83,7 @@ test("website ES modules pass Node syntax checks", () => {
   try {
     for (const path of ["src/app.js", "src/auth.js"]) {
       const syntaxFile = join(temp, path.split("/").at(-1).replace(/\\.js$/, ".mjs"));
-      writeFileSync(syntaxFile, read(path), "utf8");
+      writeFileSync(syntaxFile, read("../" + path), "utf8");
       const result = spawnSync(process.execPath, ["--check", syntaxFile], { encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr || result.stdout || path + " failed syntax check");
     }
