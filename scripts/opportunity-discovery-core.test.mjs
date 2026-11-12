@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
- extractSubmissionRoute,extractPlaylistName,parseDataForSeoResults,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
+ extractSubmissionRoute,extractPlaylistName,parseGoogleNewsRss,registrableDomain,isSafePublicHttpUrl,qualifiesPlaylist
 } from "./opportunity-discovery-core.mjs";
 
 test("extracts a music submission form action",()=>{
@@ -62,23 +62,20 @@ test("rejects generic listen-on-Spotify labels as playlist names",()=>{
  assert.equal(extractPlaylistName('<a href="https://open.spotify.com/playlist/abc123">Listen on Spotify</a>',"https://open.spotify.com/playlist/abc123","Listen on Spotify"),"");
 });
 
-test("parses only safe organic DataForSEO results and captures task cost",()=>{
- const parsed=parseDataForSeoResults({
-  status_code:20000,
-  tasks:[{status_code:20000,cost:0.004,result:[{items:[
-   {type:"organic",title:"Publisher page",url:"https://curator.example/playlist",description:"Submit your music"},
-   {type:"paid",title:"Ad",url:"https://ads.example"},
-   {type:"organic",title:"Unsafe",url:"http://127.0.0.1"}
-  ]}]}]
- });
- assert.equal(parsed.cost,0.004);
- assert.equal(parsed.items.length,1);
- assert.equal(parsed.items[0].url,"https://curator.example/playlist");
+test("parses safe Google News RSS results, including resolvable wrappers",()=>{
+ const parsed=parseGoogleNewsRss(\`<?xml version="1.0"?><rss><channel>
+  <item><title><![CDATA[Afro House playlist curator opportunity]]></title>
+   <link>https://publisher.example/playlist</link>
+   <description><![CDATA[Submit your music]]></description>
+   <pubDate>Thu, 12 Nov 2026 00:00:00 GMT</pubDate></item>
+  <item><title>Unsafe destination</title><link>http://127.0.0.1/private</link><description>blocked</description></item>
+  <item><title>Google News wrapper</title><link>https://news.google.com/rss/articles/abc123</link><description>resolve before inspection</description></item>
+ </channel></rss>\`);
+ assert.equal(parsed.length,2);
+ assert.equal(parsed[0].title,"Afro House playlist curator opportunity");
+ assert.equal(parsed[0].url,"https://publisher.example/playlist");
+ assert.equal(parsed[1].url,"https://news.google.com/rss/articles/abc123");
 });
-test("rejects failed DataForSEO task responses",()=>{
- assert.throws(()=>parseDataForSeoResults({status_code:20000,tasks:[{status_code:40000,status_message:"failed"}]}),/not successful/);
-});
-
 test("does not substitute a curator page title for a missing playlist label",()=>{
  assert.equal(extractPlaylistName("<h1>Curator Platform</h1>","https://open.spotify.com/playlist/abc123","Curator Platform"),"");
 });
