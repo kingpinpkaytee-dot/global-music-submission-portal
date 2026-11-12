@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import vm from "node:vm";
 
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -77,9 +79,16 @@ test("publication migration is one complete transaction with a closed Spotify UR
 });
 
 test("website ES modules pass Node syntax checks", () => {
-  for (const path of ["src/app.js", "src/auth.js"]) {
-    const result = spawnSync(process.execPath, ["--check", path], { encoding: "utf8" });
-    assert.equal(result.status, 0, result.stderr || result.stdout || path + " failed syntax check");
+  const temp = mkdtempSync(join(tmpdir(), "artist-frequency-esm-"));
+  try {
+    for (const path of ["src/app.js", "src/auth.js"]) {
+      const syntaxFile = join(temp, path.split("/").at(-1).replace(/\\.js$/, ".mjs"));
+      writeFileSync(syntaxFile, read(path), "utf8");
+      const result = spawnSync(process.execPath, ["--check", syntaxFile], { encoding: "utf8" });
+      assert.equal(result.status, 0, result.stderr || result.stdout || path + " failed syntax check");
+    }
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
   }
 });
 
