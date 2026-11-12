@@ -7,8 +7,9 @@ import { extractSubmissionRoute, hostnameOf, registrableDomain, isSafePublicHttp
 // second-source corroboration. Published listings never enable in-platform submissions.
 const SUPABASE_URL=process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
-const BRAVE_SEARCH_API_KEY=process.env.BRAVE_SEARCH_API_KEY;
-if(![SUPABASE_URL,SERVICE_ROLE_KEY,BRAVE_SEARCH_API_KEY].every(Boolean)) throw new Error("Missing required Supabase or Brave Search configuration.");
+const DATAFORSEO_LOGIN=process.env.DATAFORSEO_LOGIN;
+const DATAFORSEO_PASSWORD=process.env.DATAFORSEO_PASSWORD;
+if(![SUPABASE_URL,SERVICE_ROLE_KEY,DATAFORSEO_LOGIN,DATAFORSEO_PASSWORD].every(Boolean)) throw new Error("Missing required Supabase or DataForSEO configuration.");
 // Supabase's newer sb_secret_* keys are API keys, not JWTs: send them only
 // in apikey. Legacy service_role keys are JWTs and may also be sent as Bearer.
 const isNewSecretKey=SERVICE_ROLE_KEY.startsWith("sb_secret_");
@@ -83,22 +84,23 @@ function decodeHtml(s){
  return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)));
 }
 function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\s+/g," ").trim();}
-async function search(q){
- const u=new URL("https://api.search.brave.com/res/v1/web/search");
- u.searchParams.set("q",q);u.searchParams.set("count","20");
- u.searchParams.set("safesearch","strict");u.searchParams.set("spellcheck","false");u.searchParams.set("extra_snippets","true");
- let lastError=null;
- for(let attempt=0;attempt<3;attempt++){
-  try{
-   const res=await fetch(u,{headers:{"Accept":"application/json","X-Subscription-Token":BRAVE_SEARCH_API_KEY,"User-Agent":"ArtistFrequencyOpportunityDiscovery/2.0"},signal:AbortSignal.timeout(18000)});
-   const body=await res.text();
-   if(!res.ok){const error=new Error("Brave Search API HTTP "+res.status+": "+body.slice(0,300));if(res.status===429||res.status>=500){lastError=error;await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)));continue;}throw error;}
-   const data=JSON.parse(body);
-   const items=(data.web?.results||[]).map(hit=>({title:String(hit.title||""),link:String(hit.url||""),snippet:String([hit.description,...(hit.extra_snippets||[])].filter(Boolean).join(" ")),provider:"Brave Search API",publisherUrl:null,pageAge:hit.page_age||null})).filter(hit=>isSafePublicHttpUrl(hit.link));
-   return {items,providerStats:{"Brave Search API":{count:items.length,error:null}}};
-  }catch(e){lastError=e;if(attempt===2)break;}
- }
- throw lastError||new Error("Brave Search API failed without a response");
+async function search(q,locationName){
+ const authorization=Buffer.from(DATAFORSEO_LOGIN+":"+DATAFORSEO_PASSWORD).toString("base64");
+ const response=await fetch("https://api.dataforseo.com/v3/serp/google/organic/live/advanced",{
+  method:"POST",headers:{"Authorization":"Basic "+authorization,"Content-Type":"application/json","Accept":"application/json"},
+  body:JSON.stringify([{keyword:q,location_name:locationName||"South Africa",language_code:"en",depth:20,device:"desktop"}]),
+  signal:AbortSignal.timeout(45000)
+ });
+ const raw=await response.text();
+ if(!response.ok)throw new Error("DataForSEO HTTP "+response.status+": "+raw.slice(0,350));
+ const data=JSON.parse(raw);
+ if(data.status_code!==20000||!Array.isArray(data.tasks)||data.tasks[0]?.status_code!==20000||!Array.isArray(data.tasks[0]?.result))
+  throw new Error("DataForSEO task failed: "+String(data.tasks?.[0]?.status_message||data.status_message||"No SERP results").slice(0,350));
+ const task=data.tasks[0];
+ const items=task.result.flatMap(group=>group.items||[])
+  .filter(item=>item.type==="organic"&&isSafePublicHttpUrl(item.url))
+  .map(item=>({title:String(item.title||""),link:String(item.url||""),snippet:String(item.description||""),provider:"DataForSEO Google Organic",publisherUrl:null,pageAge:item.timestamp||null}));
+ return {items,providerStats:{"DataForSEO Google Organic":{count:items.length,cost:Number(task.cost||data.cost||0),statusCode:task.status_code,error:null}}};
 }
 async function readLimitedText(response,maxBytes=250000){
  const reader=response.body?.getReader();if(!reader)return "";
@@ -269,7 +271,7 @@ async function main(){
  const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of activeQueries){
   try{
-   const searchResult=await search(item.q);done++;
+   const searchResult=await search(item.q,item.region);done++;
    for(const [provider,stats] of Object.entries(searchResult.providerStats||{})){
     providerStats[provider]??={queries:0,results:0,failures:0};
     providerStats[provider].queries++;providerStats[provider].results+=stats.count||0;
@@ -306,11 +308,12 @@ async function main(){
     const metricHtml=(profileEvidence.html||"")+" "+(page.html||"");
     const route=extractSubmissionRoute(page.html||"",page.finalUrl||url)
       ||(profileEvidence.html?extractSubmissionRoute(profileEvidence.html,profileEvidence.profileUrl):null);
-    const ev=evidence(item.category,hit.title||"",hit.snippet||"",metricHtml,page.finalUrl||url,route);
-    const name=cleanName(hit.title);if(!name){rejected++;continue;}
+    const publisherTitle=extractPageTitle(page.html||"")||cleanName(hit.title);
+    const ev=evidence(item.category,publisherTitle,"",metricHtml,page.finalUrl||url,route);
+    const name=cleanName(publisherTitle);if(!name){rejected++;continue;}
     const finalUrl=page.finalUrl||url;
     let corroboration={ok:false,reason:"Primary publisher-page checks did not pass"};
-    const searchable=(name+" "+(hit.snippet||"")+" "+(page.html||"").slice(0,30000)).toLowerCase();
+    const searchable=(name+" "+(page.html||"").slice(0,30000)).toLowerCase();
     let host="",path="";
     try{const parsed=new URL(finalUrl);host=parsed.hostname.toLowerCase().replace(/^www\./,"");path=parsed.pathname.toLowerCase();}catch{}
     const genericRadioDirectories=["iheart.com","accuradio.com","radio.net","mytuner-radio.com","appradiofm.com","tunein.com","radio.garden"];
@@ -326,24 +329,24 @@ async function main(){
      platform:submissionEvidence&&/(music submission|submission portal|playlist|radio|blog|curator|submit)/i.test(searchable)
     }[item.category]===true;
     if(!categoryRelevant){
-     rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",dspDestination,genericRadioLanding,searchSnippet:(hit.snippet||"").slice(0,350)});
+     rejectedDetails.push({category:item.category,name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:ev.reason||"Evidence passed but category relevance check failed",dspDestination,genericRadioLanding});
      // Rejected search noise is recorded in the run diagnostics, not inserted
      // into the admin candidate table. This keeps the review queue clean and
      // avoids treating unqualified search results as candidate records.
      rejected++;continue;
     }
     const html=page.html||"",email=extractEmail(html);
-    const lowerText=(name+" "+(hit.snippet||"")+" "+html.slice(0,50000)).toLowerCase();
+    const lowerText=(name+" "+html.slice(0,50000)).toLowerCase();
     const knownGenres=["Amapiano","Afro House","Afrobeats","Afrobeat","Deep House","Melodic House","Organic House","Hip Hop","Rap","R&B","Soul","Funk","Jazz","Blues","Rock","Alternative","Indie","Pop","Dance","EDM","House","Tech House","Progressive House","Techno","Trance","Drum and Bass","Dubstep","Garage","Disco","Reggae","Dancehall","Gospel","Christian","Classical","Country","Folk","Metal","Punk","Latin","Reggaeton","K-Pop","J-Pop","Ambient","Downtempo","Chillout","World Music"];
     const extractedGenres=knownGenres.filter(g=>lowerText.includes(g.toLowerCase()));
-    const metrics=extractPlaylistMetrics(metricHtml+" "+(hit.snippet||"")+" "+name);
+    const metrics=extractPlaylistMetrics(metricHtml+" "+name);
     const followerCount=metrics.followerCount;
     const responseRate=metrics.responseRate;
     const activityStatus=metrics.activityStatus;
     const playlistData=ev.playlistUrl?(" | DSP playlist: "+ev.dspName+" "+ev.playlistUrl+" | Curator profile: "+(profileEvidence.profileUrl||"source page")):"";
     const qualification=qualifiesPlaylist({playlistUrl:ev.playlistUrl,followerCount,responseRate,activityStatus,submissionUrl:ev.submissionUrl});
     if(!qualification.ok){
-     rejectedDetails.push({category:"playlist",name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:qualification.failures.join("; "),followerCount,responseRate,activityStatus,submissionUrl:ev.submissionUrl,searchSnippet:(hit.snippet||"").slice(0,300)});
+     rejectedDetails.push({category:"playlist",name,url:finalUrl,provider:hit.provider||"unknown",evidenceReason:qualification.failures.join("; "),followerCount,responseRate,activityStatus,submissionUrl:ev.submissionUrl});
      rejected++;continue;
     }
     corroboration=await findIndependentCorroboration(item.category,name,finalUrl,ev.playlistUrl||null,ev.dspName||item.dsp||null,searchResult.items);
@@ -353,7 +356,7 @@ async function main(){
      method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
      body:JSON.stringify({run_id:runId,category:"playlist",name,destination_url:finalUrl,
       submission_url:ev.submissionUrl||null,
-      evidence:("Title: "+name+playlistData+" | Followers: "+followerCount+" | Response rate: "+responseRate+"% | Activity: "+activityStatus+" | Genres: "+(extractedGenres.join(", ")||"not reliably extracted")+" | Search snippet: "+(hit.snippet||"No snippet returned")+" | Submission route: "+(ev.ok?"confirmed":ev.reason||"not confirmed")+" | Independent check: "+(corroboration.ok?"matched":"manual review required")).slice(0,1800),
+      evidence:("Title: "+name+playlistData+" | Followers: "+followerCount+" | Response rate: "+responseRate+"% | Activity: "+activityStatus+" | Genres: "+(extractedGenres.join(", ")||"not reliably extracted")+" | Submission route: "+(ev.ok?"confirmed":ev.reason||"not confirmed")+" | Independent check: "+(corroboration.ok?"matched":"manual review required")).slice(0,1800),
       verification_status:"pending",
       verification_reason:"Playlist metrics meet configured thresholds; administrator review required"})
     });
@@ -394,7 +397,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"Brave Search API",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"DataForSEO Google Organic",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions.slice(0,18),providers:providerStats,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
