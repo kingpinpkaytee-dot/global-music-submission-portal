@@ -4,6 +4,7 @@ const MULTI_LABEL_SUFFIXES=new Set([
  "co.ug","co.tz","co.in","co.jp","co.kr","com.sg","com.my","com.ph","com.pk"
 ]);
 const BLOCKED_HOSTS=new Set(["localhost","metadata.google.internal","metadata.google","instance-data"]);
+function stripTags(s){return String(s||"").replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/\s+/g," ").trim();}
 
 export function hostnameOf(value){
  try{return new URL(value).hostname.toLowerCase().replace(/^\[|\]$/g,"").replace(/^www\./,"");}
@@ -52,7 +53,7 @@ export function extractSubmissionRoute(html,baseUrl){
  for(const match of source.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
   const attrs=match[1]||"",label=(match[2]||"").replace(/<[^>]*>/g," ");
   const href=attrs.match(/\bhref\s*=\s*["']([^"']+)["']/i);
-  if(!href||!intent.test(label+" "+href[1]))continue;
+  if(!href||!intent.test(label+" "+href[1])||!musicContext.test(label+" "+href[1]))continue;
   try{
    const target=new URL(href[1],baseUrl);
    if(isSafePublicHttpUrl(target.toString()))return {url:target.toString(),method:"portal"};
