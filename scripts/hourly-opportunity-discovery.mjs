@@ -278,7 +278,8 @@ async function main(){
  const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:10};const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of activeQueries){
   try{
-   const searchResult=await search(item.q,item.region);done++;
+   const searchLocation=item.region||playlistRegions[queryRotationIndex%playlistRegions.length];
+   const searchResult=await search(item.q,searchLocation);done++;
    for(const [provider,stats] of Object.entries(searchResult.providerStats||{})){
     providerStats[provider]??={queries:0,results:0,failures:0,costUsd:0};
     providerStats[provider].queries++;providerStats[provider].results+=stats.count||0;providerStats[provider].costUsd=Number((providerStats[provider].costUsd+(stats.cost||0)).toFixed(6));
@@ -369,7 +370,7 @@ async function main(){
       verification_status:"pending",
       verification_reason:"Playlist metrics meet configured thresholds; administrator review required"})
     });
-    const candidate={category:item.category,name,country:item.region||null,dsp_name:ev.dspName||item.dsp||(item.category==="playlist"?"Spotify":null),
+    const candidate={category:item.category,name,country:null,dsp_name:ev.dspName||item.dsp||(item.category==="playlist"?"Spotify":null),
      genres:extractedGenres,website_url:ev.playlistUrl||finalUrl,submission_url:ev.submissionUrl||null,contact_email:email,
      submission_method:ev.submissionMethod||(email?"email":"unknown"),
      accepts_free_submissions:/free\s+(?:music\s+)?submissions?|submit\s+for\s+free/i.test(lowerText),follower_count:followerCount,response_rate:responseRate,
@@ -406,7 +407,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),searchProvider:"DataForSEO Google Organic",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||playlistRegions[queryRotationIndex%playlistRegions.length]),searchProvider:"DataForSEO Google Organic",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
