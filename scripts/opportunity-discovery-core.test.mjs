@@ -78,3 +78,7 @@ test("parses only safe organic DataForSEO results and captures task cost",()=>{
 test("rejects failed DataForSEO task responses",()=>{
  assert.throws(()=>parseDataForSeoResults({status_code:20000,tasks:[{status_code:40000,status_message:"failed"}]}),/not successful/);
 });
+
+test("does not substitute a curator page title for a missing playlist label",()=>{
+ assert.equal(extractPlaylistName("<h1>Curator Platform</h1>","https://open.spotify.com/playlist/abc123","Curator Platform"),"");
+});
