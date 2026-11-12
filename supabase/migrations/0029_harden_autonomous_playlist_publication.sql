@@ -3,6 +3,20 @@
 -- the user's hard gates and a fresh, source-backed, independent corroboration.
 BEGIN;
 
+CREATE TABLE IF NOT EXISTS public.opportunity_discovery_runtime_config (
+  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+  publication_policy_version integer NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.opportunity_discovery_runtime_config ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.opportunity_discovery_runtime_config FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.opportunity_discovery_runtime_config TO service_role;
+INSERT INTO public.opportunity_discovery_runtime_config(singleton,publication_policy_version)
+VALUES (true,2)
+ON CONFLICT (singleton) DO UPDATE
+SET publication_policy_version=EXCLUDED.publication_policy_version,updated_at=now();
+
+
 CREATE OR REPLACE FUNCTION public.auto_publish_verified_opportunity_candidate(p_candidate_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
