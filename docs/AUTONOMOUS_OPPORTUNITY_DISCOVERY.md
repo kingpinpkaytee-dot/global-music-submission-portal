@@ -12,6 +12,8 @@ This automation publishes opportunity directory records only. It does not submit
 
 The worker uses the DataForSEO Google Organic Live Advanced endpoint. It does not use Google Custom Search JSON, Bing RSS, or Google News RSS.
 
+Brave Search API was evaluated and rejected for this persistent directory use case: its current Search API terms prohibit storing, caching or building a database of Search Results. DataForSEO's current terms permit use of SERP results with customer applications, subject to the restriction against competing with or adversely affecting the originating search engine. The portal is a specialized music-opportunity directory, not a general-purpose search engine; review the current terms before enabling the provider.
+
 - One search task per hourly run by default.
 - 57-query rotating pool: 27 territory searches and 30 Spotify curator/platform searches.
 - Up to 20 organic results per task.
