@@ -274,6 +274,30 @@ async function resolveGoogleNewsPublisher(hit){
  const title=cleanName(hit.title);if(!title)return null;
  const publisherHost=hostnameOf(hit.publisherUrl);
  const terms=title.toLowerCase().split(/\s+/).filter(x=>x.length>3).slice(0,6);
+ // Google News RSS article tokens are opaque protobuf IDs, not reliably
+ // base64-encoded destination URLs. Try the browser article route first.
+ try{
+  const match=String(hit.link||"").match(/\/rss\/articles\/([^?]+)/i);
+  if(match){
+   const articleUrl="https://news.google.com/articles/"+match[1];
+   const page=await inspect(articleUrl);
+   const finalHost=hostnameOf(page.finalUrl||"");
+   if(page.ok&&finalHost&&finalHost!=="news.google.com"&&!finalHost.endsWith(".news.google.com")){
+    const body=stripTags(page.html||"").toLowerCase();
+    const titleMatch=!terms.length||terms.filter(t=>body.includes(t)).length>=Math.min(2,terms.length);
+    if(titleMatch)return page.finalUrl;
+   }
+   if(page.ok){
+    const html=String(page.html||"");
+    const canonical=html.match(/<link[^>]+rel=["'](?:canonical|alternate)["'][^>]+href=["']([^"']+)["']/i)||html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
+    if(canonical){
+     const target=new URL(decodeHtml(canonical[1]),page.finalUrl||articleUrl);
+     const host=hostnameOf(target.toString());
+     if(host&&host!=="news.google.com"&&!host.endsWith(".news.google.com"))return target.toString();
+    }
+   }
+  }
+ }catch{}
  for(const scoped of [true,false]){
   try{
    const u=new URL("https://www.bing.com/search");u.searchParams.set("format","rss");
