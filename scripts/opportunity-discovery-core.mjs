@@ -85,6 +85,16 @@ export function extractPlaylistName(html,playlistUrl,pageTitle=""){
  return "";
 }
 
+export function parseDataForSeoResults(data){
+ if(data?.status_code!==20000||!Array.isArray(data.tasks)||data.tasks[0]?.status_code!==20000||!Array.isArray(data.tasks[0]?.result))
+  throw new Error("DataForSEO task response was not successful");
+ const task=data.tasks[0];
+ const items=task.result.flatMap(group=>group.items||[])
+  .filter(item=>item.type==="organic"&&isSafePublicHttpUrl(item.url))
+  .map(item=>({title:String(item.title||""),url:String(item.url||""),description:String(item.description||""),pageAge:item.timestamp||null}));
+ return {items,cost:Number(task.cost||data.cost||0),statusCode:task.status_code};
+}
+
 export function qualifiesPlaylist({playlistUrl,followerCount,responseRate,activityStatus,submissionUrl}){
  const failures=[];
  if(!/^https:\/\/open\.spotify\.com\/playlist\/[A-Za-z0-9]+(?:[/?#].*)?$/i.test(String(playlistUrl||"")))failures.push("individual public Spotify playlist URL missing");
