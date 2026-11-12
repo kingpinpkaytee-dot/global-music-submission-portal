@@ -1,4 +1,4 @@
-import { extractSubmissionRoute, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
+import { extractSubmissionRoute, extractPlaylistName, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
 
 // Global music-opportunity discovery for Artist Frequency.
 // Public playlist discovery target: 18,000+ unique opportunities over time.
@@ -321,7 +321,8 @@ async function main(){
     const publisherTitle=extractPageTitle(page.html||"");
     if(!publisherTitle){rejectedDetails.push({category:item.category,name:"Unidentified publisher page",url:page.finalUrl||url,provider:hit.provider||"unknown",evidenceReason:"Publisher page did not expose its own title"});rejected++;continue;}
     const ev=evidence(item.category,publisherTitle,"",metricHtml,page.finalUrl||url,route);
-    const name=cleanName(publisherTitle);if(!name){rejected++;continue;}
+    const name=cleanName(extractPlaylistName(metricHtml,ev.playlistUrl,publisherTitle));
+    if(!name){rejectedDetails.push({category:"playlist",name:"Unidentified Spotify playlist",url:page.finalUrl||url,provider:hit.provider||"unknown",evidenceReason:"Publisher page did not expose a specific playlist name"});rejected++;continue;}
     const finalUrl=page.finalUrl||url;
     let corroboration={ok:false,reason:"Primary publisher-page checks did not pass"};
     const searchable=(name+" "+(page.html||"").slice(0,30000)).toLowerCase();
@@ -375,7 +376,7 @@ async function main(){
      genres:extractedGenres,website_url:ev.playlistUrl||finalUrl,submission_url:ev.submissionUrl||null,contact_email:email,
      submission_method:ev.submissionMethod||(email?"email":"unknown"),
      accepts_free_submissions:/free\s+(?:music\s+)?submissions?|submit\s+for\s+free/i.test(lowerText),follower_count:followerCount,response_rate:responseRate,
-     activity_status:activityStatus,source_name:(hit.provider||"Public Web Search")+(item.dsp?" / "+item.dsp:""),
+     activity_status:activityStatus,source_name:publisherTitle,
      source_url:finalUrl,evidence_url:page.ok?finalUrl:null,first_seen_at:now(),last_checked_at:now(),review_status:"pending",
      ...(autoPublicationEnabled?{auto_verification:ev.ok&&corroboration.ok?{
       schema_version:"2",score:qualification.score,score_type:"rule_gate_completion",
