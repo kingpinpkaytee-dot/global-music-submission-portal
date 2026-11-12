@@ -1,4 +1,4 @@
-import { extractSubmissionRoute, extractPlaylistName, parseDataForSeoResults, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
+import { extractSubmissionRoute, extractPlaylistName, parseGoogleNewsRss, hostnameOf, registrableDomain, isSafePublicHttpUrl, qualifiesPlaylist } from "./opportunity-discovery-core.mjs";
 
 // Global music-opportunity discovery for Artist Frequency.
 // Discovery backlog target: build toward 18,000+ researched candidates over time; this is a target, not a forecast or verified count.
@@ -7,9 +7,7 @@ import { extractSubmissionRoute, extractPlaylistName, parseDataForSeoResults, ho
 // second-source corroboration. Published listings never enable in-platform submissions.
 const SUPABASE_URL=process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
-const DATAFORSEO_LOGIN=process.env.DATAFORSEO_LOGIN;
-const DATAFORSEO_PASSWORD=process.env.DATAFORSEO_PASSWORD;
-if(![SUPABASE_URL,SERVICE_ROLE_KEY,DATAFORSEO_LOGIN,DATAFORSEO_PASSWORD].every(Boolean)) throw new Error("Missing required Supabase or DataForSEO configuration.");
+if(![SUPABASE_URL,SERVICE_ROLE_KEY].every(Boolean)) throw new Error("Missing required Supabase configuration.");
 // Supabase's newer sb_secret_* keys are API keys, not JWTs: send them only
 // in apikey. Legacy service_role keys are JWTs and may also be sent as Bearer.
 const isNewSecretKey=SERVICE_ROLE_KEY.startsWith("sb_secret_");
@@ -81,17 +79,15 @@ function decodeHtml(s){
 }
 function stripTags(s){return decodeHtml(String(s||"").replace(/<[^>]*>/g," ")).replace(/\s+/g," ").trim();}
 async function search(q,locationName){
- const authorization=Buffer.from(DATAFORSEO_LOGIN+":"+DATAFORSEO_PASSWORD).toString("base64");
- const response=await fetch("https://api.dataforseo.com/v3/serp/google/organic/live/advanced",{
-  method:"POST",headers:{"Authorization":"Basic "+authorization,"Content-Type":"application/json","Accept":"application/json"},
-  body:JSON.stringify([{keyword:q,location_name:locationName||"South Africa",language_code:"en",depth:20,device:"desktop"}]),
-  signal:AbortSignal.timeout(45000)
- });
- const raw=await response.text();
- if(!response.ok)throw new Error("DataForSEO HTTP "+response.status+": "+raw.slice(0,350));
- const parsed=parseDataForSeoResults(JSON.parse(raw));
- const items=parsed.items.map(item=>({...item,link:item.url,snippet:item.description,provider:"DataForSEO Google Organic",publisherUrl:null}));
- return {items,providerStats:{"DataForSEO Google Organic":{count:items.length,cost:parsed.cost,statusCode:parsed.statusCode,error:null}}};
+ const regionCodes={"South Africa":"ZA","Nigeria":"NG","Ghana":"GH","Kenya":"KE","Tanzania":"TZ","Uganda":"UG","United Kingdom":"GB","United States":"US","Canada":"CA","Brazil":"BR","Mexico":"MX","Argentina":"AR","Germany":"DE","France":"FR","Netherlands":"NL","Sweden":"SE","Spain":"ES","Italy":"IT","India":"IN","Japan":"JP","South Korea":"KR","Australia":"AU","New Zealand":"NZ","Jamaica":"JM","Trinidad and Tobago":"TT","Portugal":"PT","Poland":"PL"};
+ const country=regionCodes[locationName]||"ZA";
+ const params=new URLSearchParams({q,hl:"en-US",gl:country,ceid:country+":en"});
+ const endpoint="https://news.google.com/rss/search?"+params.toString();
+ const response=await fetch(endpoint,{headers:{"User-Agent":"ArtistFrequencyOpportunityResearch/2.1","Accept":"application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.5"},signal:AbortSignal.timeout(20000)});
+ const xml=await response.text();
+ if(!response.ok)throw new Error("Google News RSS HTTP "+response.status+": "+xml.slice(0,300));
+ const items=parseGoogleNewsRss(xml).map(item=>({...item,link:item.url,snippet:item.description,provider:"Google News RSS (free)",publisherUrl:null}));
+ return {items,providerStats:{"Google News RSS (free)":{count:items.length,cost:0,statusCode:response.status,error:null}}};
 }
 async function readLimitedText(response,maxBytes=250000){
  const reader=response.body?.getReader();if(!reader)return "";
@@ -251,7 +247,7 @@ async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl
  let attemptsForCandidate=0;
  for(const hit of (hits||[]).slice(0,20)){
   const candidate=hit.link,host=hostnameOf(candidate),domain=registrableDomain(candidate);
-  if(!host||!isSafePublicHttpUrl(candidate)||!domain||domain===primaryDomain||host==="news.google.com"||host.endsWith(".news.google.com"))continue;
+  if(!host||!isSafePublicHttpUrl(candidate)||!domain||domain===primaryDomain)continue;
   const searchable=(String(hit.title||"")+" "+String(hit.snippet||"")).toLowerCase();
   const overlap=terms.filter(term=>searchable.includes(term)).length;
   if((playlistUrl&&searchable.includes(playlistUrl.toLowerCase()))||overlap>=Math.min(2,terms.length)){
@@ -304,11 +300,18 @@ async function main(){
      rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Excluded known dictionary or unrelated submission-platform noise"});
      rejected++;continue;
     }
+    let page;
     if(urlHost==="news.google.com"||urlHost.endsWith(".news.google.com")){
-     rejectedDetails.push({category:item.category,name:"Rejected search result",url:hit.link,provider:hit.provider||"unknown",evidenceReason:"Google News redirect wrappers are excluded; only direct publisher URLs are accepted"});
-     rejected++;continue;
+     page=await inspect(url);
+     if(!page.ok||hostnameOf(page.finalUrl||url)==="news.google.com"||String(page.finalUrl||url).includes("news.google.com")){
+      rejectedDetails.push({category:item.category,name:"Unresolved Google News result",url:hit.link,provider:hit.provider||"unknown",evidenceReason:page.reason||"Google News did not resolve to a direct publisher page"});
+      rejected++;continue;
+     }
+     url=page.finalUrl;
+     urlHost=hostnameOf(url);
+    }else{
+     page=await inspect(url);
     }
-    let page=await inspect(url);
 
     const profileEvidence=item.category==="playlist"&&page.ok
       ? await inspectCuratorProfileEvidence(page.html||"",page.finalUrl||url)
