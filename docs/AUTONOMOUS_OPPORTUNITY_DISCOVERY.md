@@ -10,20 +10,13 @@ This automation publishes opportunity directory records only. It does not submit
 
 ## Search provider and operating cost
 
-The worker uses the DataForSEO Google Organic Live Advanced endpoint. It does not use Google Custom Search JSON, Bing RSS, or Google News RSS.
+The worker has been reverted to Google's public News RSS search endpoint. It requires no paid API, no API account, no card and no DataForSEO credentials. The scheduled worker rotates through the existing 57-query pool and resolves Google News article links to direct publisher pages before inspecting them.
 
-Brave Search API was evaluated and rejected for this persistent directory use case: its current Search API terms prohibit storing, caching or building a database of Search Results. DataForSEO's current terms permit use of SERP results with customer applications, subject to the restriction against competing with or adversely affecting the originating search engine. The portal is a specialized music-opportunity directory, not a general-purpose search engine; review the current terms before enabling the provider.
+This is a constrained, zero-search-fee fallback, not a full Google Web Search API. Google News is news-focused, so curator discovery coverage may be narrower and candidate yield may be lower than a general web index. Microsoft retired its public Bing Search APIs on 11 August 2025, so the old Bing Search API is not a valid free fallback. The worker does not scrape Google's Search HTML interface.
 
-- One search task per hourly run by default.
-- 57-query rotating pool: 27 territory searches and 30 Spotify curator/platform searches.
-- Up to 20 organic results per task.
-- The worker stores publisher-page-derived metadata after fetching and checking the actual publisher page. Raw search snippets are used only transiently and are not written into candidate records or run logs.
-- Costly site: search operators are deliberately excluded; they multiply DataForSEO SERP charges.
-- Actual task cost is read from DataForSEO's response and recorded in the Actions log.
-- At the Live rate of $0.002 per 10 results, depth 20 is approximately $0.004 per hourly task, or about $2.88 for 30 days of hourly runs. Actual billing is determined by the returned task cost and current provider pricing.
-- DataForSEO currently requires a $50 minimum account top-up for paid use. New accounts have a $1 trial credit; unused balance does not expire. At the estimated run rate, a $50 balance would cover roughly 17 months, subject to actual task cost. The user must authorize and fund the account; the workflow never purchases credits or enables auto-reload.
+RSS titles, snippets and feed metadata are transient search inputs. The worker persists only metadata extracted from the inspected publisher page and its own verification evidence. A Google News result that cannot be resolved to a direct publisher page is rejected. Provider cost is logged as USD 0; page inspection is limited by the existing runtime and per-run corroboration budgets.
 
-DataForSEO's terms prohibit using SERP data to compete with or adversely affect the search engine providers. Artist Frequency is a specialized music-opportunity directory, not a general-purpose search engine. Review the current provider terms before activating the API account.
+No paid search provider is configured or called. Do not create DataForSEO credentials or fund a search account while the project is operating in this zero-budget mode.
 
 ## Autonomous playlist publication gates
 
@@ -57,15 +50,11 @@ Missing metrics, uncertain activity, missing route, unsafe URL, or missing indep
 
 ## Required one-time setup
 
-Add these repository secrets in GitHub Settings → Secrets and variables → Actions:
+Add only the existing server-side secret in GitHub Settings → Secrets and variables → Actions:
 
 - SUPABASE_SERVICE_ROLE_KEY — existing Supabase server-side secret/service-role key.
-- DATAFORSEO_LOGIN — API login from the DataForSEO API Access dashboard.
-- DATAFORSEO_PASSWORD — API password from the same dashboard.
 
-The Supabase project URL is already configured in the workflow. Never add these credentials to frontend files, VITE_ variables, source control, or public issue comments.
-
-A DataForSEO account and sufficient prepaid/available API balance are required. The workflow does not automatically add funds or enable auto-reload.
+The Supabase project URL is already configured in the workflow. No search-provider API credentials are required. Never add server-side credentials to frontend files, VITE_ variables, source control, or public issue comments.
 
 ## Required database setup
 
@@ -82,7 +71,7 @@ Do not apply migrations blindly if the production migration history is inconsist
 
 The workflow automatically runs the built-in Node test suite before any search request. The tests cover:
 
-- DataForSEO response parsing and paid/unsafe-result rejection;
+- Google News RSS parsing and unsafe-result rejection;
 - playlist-name extraction from the exact Spotify link;
 - direct form and portal route extraction;
 - newsletter-form and unrelated-link rejection;
