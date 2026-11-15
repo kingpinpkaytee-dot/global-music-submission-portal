@@ -19,15 +19,16 @@ All other checks remain in place: an individual public Spotify playlist URL, exp
 - GitHub Actions now runs four searches per hourly discovery pass instead of two.
 - `playlistdock.com` was added to automated-collection exclusions after its published terms explicitly prohibited scraping, reverse engineering and service disruption. Do not fetch or scrape its pages automatically.
 
-## Verification
+## Verification before database migration 0030
 
 Local tests on the operator's Acer: **29 passed, 0 failed**.
 
 GitHub Actions:
 - Run #75 (commit `c4724c08fa8570a4b88542fd5f8f01f2fc7af73d`): success; four searches; 10 candidates seen; 0 queued; 0 published; 10 rejected; 0 errors.
 - Run #76 (commit `08003bbccca5c16684e575e5711612a9efb21d2c`): success; four searches; 10 candidates seen; 0 queued; 0 published; 10 rejected; 0 errors.
+- Run #77 (documentation commit `a03585e9ffebcffb71ddc37048da130138e045eb`): success; four searches; 10 candidates seen; 0 queued; 0 published; 10 rejected; 0 errors.
 
-Neither run reported `AUTOPUBLISH_DISABLED` or `PGRST205`. The current free Bing RSS results still mainly resolve to generic Spotify landing, login or download pages; no candidate passed every evidence gate. These are discovery failures, not successful imports.
+Those runs did not report `AUTOPUBLISH_DISABLED` or `PGRST205`. The free Bing RSS results mainly resolved to generic Spotify landing, login, download or app-link pages; no candidate passed every evidence gate. These are discovery failures, not successful imports.
 
 ## Current public directory audit
 
@@ -35,22 +36,37 @@ The anonymous read-only audit found 15 active, verified public playlist rows. Ap
 
 The 86-follower playlist now qualifies. No claim is made that the entire target of 1,896 playlists has been sourced or verified.
 
-## Database migration still required
+## Database migration 0030 — operator-confirmed applied
 
-The live database publication function from migration 0029 still has the old 100-follower check until migration 0030 is applied. The new worker and website code therefore should not be treated as having activated the new database publication threshold yet.
+The operator ran `supabase/migrations/0030_playlist_minimum_followers_15.sql` in the Supabase SQL Editor for project `mdcvewnevgsgmyfnybgn` and reported the result:
 
-The new migration is:
+**“Success. No rows returned.”**
+
+This is the expected result for the migration's transactional `DO` block. The migration updates only the two follower-count guards inside `public.auto_publish_verified_opportunity_candidate(uuid)`:
+
+- candidate follower count: reject below 15 (15 is accepted);
+- corroborating evidence follower count: reject below 15 (15 is accepted).
+
+The active-status, 0.5%–100% response-rate, individual Spotify URL, HTTPS submission route, evidence freshness and independent-corroboration guards remain unchanged. The migration raises an exception if it cannot verify the expected old/new expressions and does not delete or truncate records.
+
+Migration source:
 `supabase/migrations/0030_playlist_minimum_followers_15.sql`
 
 Operator's copy:
-`C:\Users\USER\Downloads\ArtistFrequency_Migration_0030_15_Follower_Minimum.sql`
+`C:\\Users\\USER\\Downloads\\ArtistFrequency_Migration_0030_15_Follower_Minimum.sql`
 
 SHA-256:
 `2c78398cbee8f53e818ef918ca51b1fd746857052eda812eaaec6d189dba85d8`
 
-Run that file in the Supabase SQL Editor for project `mdcvewnevgsgmyfnybgn`. It safely replaces only the two database follower comparisons (candidate and evidence) and preserves the existing active-status, response-rate, Spotify URL, HTTPS route, freshness and independent-corroboration checks. It is idempotent and raises an exception rather than silently continuing if the expected old/new guards cannot be verified.
+## Post-migration verification still pending
 
-After it runs successfully, rerun the hourly workflow and confirm the exact queued/published counts. A listing counts as published only when the RPC confirms insertion into `opportunity_directories`.
+The next hourly discovery run must be checked for:
+- absence of `AUTOPUBLISH_DISABLED` and `PGRST205`;
+- actual candidates seen, queued and rejected;
+- the exact number of records published by the publication RPC;
+- any errors or duplicate skips.
+
+A listing counts as published only when the RPC confirms insertion into `opportunity_directories`. Migration success alone does not mean a playlist was discovered or published.
 
 ## Preview
 
