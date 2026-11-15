@@ -101,7 +101,7 @@ if (!isSupabaseConfigured || !supabase) {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin + "/?view=account&authRequired=submission" }
+        options: { redirectTo: window.location.origin + window.location.pathname + window.location.search }
       });
       if (error) throw error;
     } catch (error) {
@@ -115,7 +115,7 @@ if (!isSupabaseConfigured || !supabase) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "spotify",
         options: {
-          redirectTo: window.location.origin + "/?view=account&authRequired=submission",
+          redirectTo: window.location.origin + window.location.pathname + window.location.search,
           scopes: "user-read-email"
         }
       });
