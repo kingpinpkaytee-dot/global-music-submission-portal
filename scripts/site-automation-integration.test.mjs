@@ -43,6 +43,48 @@ test("internal Artist Frequency navigation always replaces the current tab", () 
   assert.ok(handler.includes("window.location.assign(destination.href)"));
   assert.ok(handler.indexOf("if (isInternalRoute)") < handler.indexOf("window.open("),
     "same-origin route handling must occur before any popup creation");
+
+  let clickHandler;
+  let assignedUrl = null;
+  let openedUrl = null;
+  const context = {
+    URL,
+    document: { addEventListener(type, callback) { if (type === "click") clickHandler = callback; } },
+    window: {
+      location: {
+        href: "https://artist-frequency-preview.example/?view=dashboard",
+        origin: "https://artist-frequency-preview.example",
+        assign(url) { assignedUrl = url; }
+      },
+      open(url, name, features) {
+        openedUrl = { url, name, features };
+        return { opener: null, focus() {} };
+      }
+    }
+  };
+  vm.runInNewContext(handler, context);
+  assert.equal(typeof clickHandler, "function");
+
+  let defaultPrevented = false;
+  const internalAnchor = { target: "_blank", getAttribute: () => "?view=submissions" };
+  clickHandler({
+    target: { closest: () => internalAnchor },
+    preventDefault() { defaultPrevented = true; }
+  });
+  assert.equal(defaultPrevented, true);
+  assert.equal(assignedUrl, "https://artist-frequency-preview.example/?view=submissions");
+  assert.equal(openedUrl, null, "same-origin workspace route must not create a browser tab");
+
+  assignedUrl = null;
+  defaultPrevented = false;
+  const externalAnchor = { target: "_blank", getAttribute: () => "https://open.spotify.com/playlist/example" };
+  clickHandler({
+    target: { closest: () => externalAnchor },
+    preventDefault() { defaultPrevented = true; }
+  });
+  assert.equal(defaultPrevented, true);
+  assert.equal(assignedUrl, null);
+  assert.equal(openedUrl?.url, "https://open.spotify.com/playlist/example");
 });
 
 test("Premium pricing routes from public navigation and dashboard", () => {
