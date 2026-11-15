@@ -26,7 +26,7 @@ test("blocks unsafe, private and non-http destinations",()=>{
  assert.equal(isSafePublicHttpUrl("https://soundplate.com/submit"),true);
 });
 test("blocks automated collection from services whose terms prohibit scraping",()=>{
- for(const url of ["https://submitlink.io/c/test","https://app.submitlink.io/c/test","https://www.submithub.com/curators","https://soundplate.com/","https://playlist.com/"]) assert.equal(isRestrictedAutomationSource(url),true,url);
+ for(const url of ["https://submitlink.io/c/test","https://app.submitlink.io/c/test","https://www.submithub.com/curators","https://soundplate.com/","https://playlist.com/","https://playlistdock.com/"]) assert.equal(isRestrictedAutomationSource(url),true,url);
  assert.equal(isRestrictedAutomationSource("https://independentcurator.example/submit"),false);
 });
 

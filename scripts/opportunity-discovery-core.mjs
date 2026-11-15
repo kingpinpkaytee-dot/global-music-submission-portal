@@ -69,7 +69,7 @@ export function hostnameOf(value){
 }
 
 
-const RESTRICTED_AUTOMATION_DOMAINS=new Set(["submitlink.io","submithub.com","soundplate.com","playlist.com"]);
+const RESTRICTED_AUTOMATION_DOMAINS=new Set(["submitlink.io","submithub.com","soundplate.com","playlist.com","playlistdock.com"]);
 export function isRestrictedAutomationSource(value){
  const host=hostnameOf(value);
  return Boolean(host&&[...RESTRICTED_AUTOMATION_DOMAINS].some(domain=>host===domain||host.endsWith("."+domain)));
