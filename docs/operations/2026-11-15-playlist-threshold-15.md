@@ -58,15 +58,29 @@ Operator's copy:
 SHA-256:
 `2c78398cbee8f53e818ef918ca51b1fd746857052eda812eaaec6d189dba85d8`
 
-## Post-migration verification still pending
+## Post-migration worker verification — GitHub Actions run #78
 
-The next hourly discovery run must be checked for:
-- absence of `AUTOPUBLISH_DISABLED` and `PGRST205`;
-- actual candidates seen, queued and rejected;
-- the exact number of records published by the publication RPC;
-- any errors or duplicate skips.
+The documentation commit triggered the hourly discovery workflow after the operator confirmed migration 0030 was applied.
 
-A listing counts as published only when the RPC confirms insertion into `opportunity_directories`. Migration success alone does not mean a playlist was discovered or published.
+- Run: #78
+- Run ID: `43752249086`
+- Commit: `f554b70e58ef043a809de4bcc9453dbc0d57c816`
+- Trigger: push to `main`
+- Result: **success**
+- Configuration validation: passed
+- Playlist qualification tests: passed
+- Website/automation integration tests: passed
+- Discovery searches: 4
+- Candidates seen: 20
+- Candidates queued: 0
+- Records published: 0
+- Records rejected: 20
+- Duplicates skipped: 0
+- Errors: 0
+
+The worker log contained neither `AUTOPUBLISH_DISABLED` nor `PGRST205`, and the 15-follower rejection rule was present. This confirms the post-migration worker pass completed without the previous disabled-publication or missing-runtime-table warnings.
+
+**No new playlist was published in run #78.** All 20 search results failed one or more evidence requirements, mainly because they were generic pages or lacked explicit activity, response-rate and independently verified HTTPS submission-route evidence. Since no candidate was queued, this run did not exercise a successful publication insert; a future qualifying candidate is still needed to verify a new row end to end.
 
 ## Preview
 
