@@ -95,10 +95,17 @@ test("automation stages candidates then invokes the guarded publication RPC", ()
   assert.ok(worker.includes("AUTOPUBLISH_DISABLED"));
 });
 
-test("discovery targets small playlists, accepts 15+ followers and runs four searches hourly", () => {
+test("discovery searches broad curator sources and runs bounded independent corroboration", () => {
   assert.ok(worker.includes("at least 15 followers"));
   assert.ok(worker.includes('Math.min(4,requestedSearches)'));
-  assert.ok(worker.includes('"small playlist"'));
+  assert.ok(worker.includes("site:qrtrplaylists.com"));
+  assert.ok(worker.includes("site:indiemono.com"));
+  assert.ok(worker.includes("site:vibeagency.net"));
+  assert.ok(worker.includes("site:pitchplaylists.com"));
+  const querySource = worker.slice(worker.indexOf("const playlistQueries="), worker.indexOf("const queries="));
+  assert.ok(!querySource.includes('"followers" OR "response rate"'), "metrics must be inspected after discovery, not required in search snippets");
+  assert.ok(worker.includes("searchesRemaining:4,searchesUsed:0"));
+  assert.ok(worker.includes("corroborationSearchesUsed:corroborationBudget.searchesUsed"));
   assert.ok(workflow.includes('DISCOVERY_SEARCHES_PER_RUN: "4"'));
 });
 
