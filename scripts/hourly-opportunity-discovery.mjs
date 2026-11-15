@@ -32,10 +32,10 @@ const playlistQueries=playlistRegions.map(region=>({
  q:'("Spotify playlist" OR "open.spotify.com/playlist") ("submit your track" OR "submit music" OR "music submission" OR "curator submission") ("Amapiano" OR "Afro House" OR "Deep House" OR "Afrobeats" OR "House") "'+region+'" -jobs -definition -dictionary -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com -site:playlist.com -site:playlistdock.com -site:delaynote.com -site:isitagoodplaylist.com -site:playlistmap.com -site:playlistsupply.com'
 }));
 const platformPlaylistQueries=[
- {category:"playlist",dsp:"House Music With Love — official playlist submission page",q:'site:housemusicwithlove.com/spotify-playlists "Spotify Playlists" "Followers" "Submit your track"'},
- {category:"playlist",dsp:"QRTR Playlists — free pitch page",q:'site:qrtrplaylists.com "pitch your music for free" Spotify playlist'},
- {category:"playlist",dsp:"Pitchplaylists — curator directory",q:'site:pitchplaylists.com Spotify playlist curator playlists followers response rate'},
- {category:"playlist",dsp:"DailyPlaylists — published Amapiano playlist roundups",q:'site:dailyplaylists.com/blog Amapiano Spotify playlist curator followers'},
+ {category:"playlist",dsp:"House Music With Love — official playlist submission page",expectedDomain:"housemusicwithlove.com",q:'site:housemusicwithlove.com/spotify-playlists "Spotify Playlists" "Followers" "Submit your track"'},
+ {category:"playlist",dsp:"QRTR Playlists — free pitch page",expectedDomain:"qrtrplaylists.com",q:'site:qrtrplaylists.com "pitch your music for free" Spotify playlist'},
+ {category:"playlist",dsp:"Pitchplaylists — curator directory",expectedDomain:"pitchplaylists.com",q:'site:pitchplaylists.com Spotify playlist curator playlists followers response rate'},
+ {category:"playlist",dsp:"DailyPlaylists — published Amapiano playlist roundups",expectedDomain:"dailyplaylists.com",q:'site:dailyplaylists.com/blog Amapiano Spotify playlist curator followers'},
  {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" ("submit your track" OR "submit your music") ("Amapiano" OR "Afro House" OR "Deep House" OR "Afrobeats") -jobs -dictionary -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com'},
  {category:"playlist",dsp:"Free playlist submission websites",q:'"free playlist submission" Spotify curator playlist submit music -jobs -dictionary -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:play.google.com -site:poki.com -site:crazygames.com'},
  {category:"playlist",dsp:"South African independent curator pages",q:'"Spotify playlist" "music submission" curator "South Africa" OR Nigeria OR Ghana -jobs -dictionary -site:spotify.com'},
@@ -299,7 +299,7 @@ async function main(){
   if(!autoPublicationEnabled)console.log("AUTOPUBLISH_DISABLED: publication policy version 2 is not active; qualified candidates will remain private.");
  }catch(e){autoPublicationEnabled=false;console.log("AUTOPUBLISH_DISABLED: migrations 0028-0029 are not active; discovery will continue without public publication. "+String(e.message||e).slice(0,250));}
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:10,searchesRemaining:4,searchesUsed:0};const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:10,searchesRemaining:4,searchesUsed:0};const providerDiagnostics={};const sourceQueryDiagnostics=[];const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of activeQueries){
   try{
    const searchLocation=item.region||playlistRegions[queryRotationIndex%playlistRegions.length];
@@ -309,7 +309,9 @@ async function main(){
     providerStats[provider].queries++;providerStats[provider].results+=stats.count||0;providerStats[provider].costUsd=Number((providerStats[provider].costUsd+(stats.cost||0)).toFixed(6));
     if(stats.error){providerStats[provider].failures++;providerDiagnostics[provider]??=[];providerDiagnostics[provider].push({query:item.q,error:stats.error});}
    }
-   for(const hit of searchResult.items){
+   const sourceFilteredItems=item.expectedDomain?searchResult.items.filter(hit=>{const host=hostnameOf(hit.link);return host===item.expectedDomain||host.endsWith("."+item.expectedDomain);}):searchResult.items;
+   sourceQueryDiagnostics.push({query:item.q,expectedDomain:item.expectedDomain||null,resultsReturned:searchResult.items.length,acceptedResults:sourceFilteredItems.length});
+   for(const hit of sourceFilteredItems){
     const categoryKey=item.category+"|"+hit.link.toLowerCase();
     if(categorySeen.has(categoryKey))continue;
     categorySeen.add(categoryKey);
@@ -447,7 +449,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||"Global"),searchProvider:"Bing RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,corroborationSearchesUsed:corroborationBudget.searchesUsed,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||"Global"),searchProvider:"Bing RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,corroborationSearchesUsed:corroborationBudget.searchesUsed,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,sourceQueryDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
