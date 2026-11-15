@@ -20,12 +20,6 @@ const cancelPremiumFunction = read("../supabase/functions/cancel-premium-subscri
 const paymentAdminFunction = read("../supabase/functions/payment-admin-status/index.ts");
 const paystackWebhookFunction = read("../supabase/functions/paystack-webhook/index.ts");
 const supabaseConfig = read("../supabase/config.toml");
-const premiumMigration31 = read("../supabase/migrations/0031_artist_premium_subscriptions.sql");
-const createPremiumFunction = read("../supabase/functions/create-premium-subscription/index.ts");
-const cancelPremiumFunction = read("../supabase/functions/cancel-premium-subscription/index.ts");
-const paymentAdminFunction = read("../supabase/functions/payment-admin-status/index.ts");
-const paystackWebhookFunction = read("../supabase/functions/paystack-webhook/index.ts");
-const supabaseConfig = read("../supabase/config.toml");
 const workflow = read("../.github/workflows/hourly-opportunity-discovery.yml");
 
 test("embedded website routing scripts parse as JavaScript", () => {
