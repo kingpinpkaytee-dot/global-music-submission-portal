@@ -24,23 +24,26 @@ const playlistRegions=[
 ];
 // Playlist-only discovery: all genres, worldwide, across major DSPs and curator platforms.
 // Qualification: at least 15 followers, explicitly active, response rate 0.5%-100%.
+// Search for likely curator/source pages first. Followers, activity and response
+// metrics are verified from the live source page after discovery; requiring every
+// metric in the search phrase made Bing return dictionaries and generic noise.
 const playlistQueries=playlistRegions.map(region=>({
  category:"playlist",region,
- q:`("Spotify playlist curator" OR "submit your music" OR "emerging playlist") ("followers" OR "response rate" OR "submission form") ("small playlist" OR "niche playlist" OR "independent curator") "${region}" active -jobs -definition -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com -site:playlist.com`
+ q:'("Spotify playlist" OR "open.spotify.com/playlist") ("submit your track" OR "submit music" OR "music submission" OR "curator submission") ("Amapiano" OR "Afro House" OR "Deep House" OR "Afrobeats" OR "House") "'+region+'" -jobs -definition -dictionary -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com -site:playlist.com -site:playlistdock.com -site:delaynote.com -site:isitagoodplaylist.com -site:playlistmap.com -site:playlistsupply.com'
 }));
 const platformPlaylistQueries=[
- {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist curator" "submission form" "followers" "response rate" ("small playlist" OR "emerging playlist" OR "niche playlist") -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
- {category:"playlist",dsp:"Independent curator profiles",q:'"submit your music" "Spotify playlist" curator "followers" active -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
- {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist" curator "response rate" "last active" -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
- {category:"playlist",dsp:"Independent curator profiles",q:'"Playlist Followers" "Response Rate" Spotify playlist submissions curator -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
- {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlists" "submit music" "followers" "active curator" -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
- {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist submission" "response within" curator profile -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
- {category:"playlist",dsp:"Daily Playlists profiles",q:'site:dailyplaylists.com Spotify playlist curator followers submission active'},
- {category:"playlist",dsp:"Pitchplaylists profiles",q:'site:pitchplaylists.com Spotify playlist curator followers submissions'},
- {category:"playlist",dsp:"Groover profiles",q:'site:groover.co Spotify playlist curator "response rate" active'},
- {category:"playlist",dsp:"Playlist curator websites",q:'"Spotify playlist curator" "submit music" "contact" followers active independent'},
- {category:"playlist",dsp:"Playlist curator websites",q:'"Spotify playlist" curator "submission" "followers" "genres" music'},
- {category:"playlist",dsp:"Playlist curator websites",q:'"playlist pitch" Spotify curator active submissions followers'}
+ {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" ("submit your track" OR "submit your music") ("Amapiano" OR "Afro House" OR "Deep House" OR "Afrobeats") -jobs -dictionary -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com'},
+ {category:"playlist",dsp:"Free playlist submission websites",q:'"free playlist submission" Spotify curator playlist submit music -jobs -dictionary -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com'},
+ {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "music submission" "curator" "South Africa" OR Nigeria OR Ghana -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submit a track" "Deep House" OR "Afro House" curator -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submit your music" Amapiano OR Afrobeats curator -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"Recently updated curator playlists",q:'"Spotify playlist" curator "updated weekly" OR "updated monthly" "submit music" -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"QRTR Playlists",q:'site:qrtrplaylists.com ("Spotify" OR playlist) ("pitch your music" OR "submit")'},
+ {category:"playlist",dsp:"Indiemono",q:'site:indiemono.com ("Spotify playlist" OR "playlists") ("followers" OR "submit your music")'},
+ {category:"playlist",dsp:"Vibe Agency",q:'site:vibeagency.net ("Open in Spotify" OR "Listen on Spotify") ("Afro House" OR "Deep House" OR "Organic House")'},
+ {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com ("Spotify" AND playlist) curator feedback'},
+ {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submission form" curator electronic music -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" "send your music" OR "send us your music" -jobs -dictionary -site:spotify.com'
 ];
 const queries=Array.from({length:Math.max(playlistQueries.length,platformPlaylistQueries.length)},(_,i)=>[playlistQueries[i],platformPlaylistQueries[i]].filter(Boolean)).flat();
 const requestedSearches=Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1);
@@ -224,13 +227,16 @@ function extractPlaylistMetrics(value){
  let followerCount=null;
  for(const re of followerPatterns){const m=text.match(re);if(m){followerCount=parseCount(m[1]);if(followerCount!==null)break;}}
  const responsePatterns=[
-  /(?:response\s*rate|response_rate|responseRate)\s*["']?\s*[:=\-]?\s*["']?(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%?/i,
-  /(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%\s*(?:response\s*rate)/i,
+  /(?:response\s*rate|reply\s*rate|response_rate|responseRate|replies)\s*["']?\s*[:=\-]?\s*["']?(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%?/i,
+  /(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%\s*(?:response\s*rate|reply\s*rate|replies)/i,
   /responds?\s+to\s+(100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)\s*%/i
  ];
  let responseRate=null;
  for(const re of responsePatterns){const m=text.match(re);if(m){responseRate=Number(m[1]);if(Number.isFinite(responseRate))break;}}
- const activeEvidence=/(?:status|curator status|playlist status|account status|activity_status)\s*["']?\s*[:=\-]?\s*["']?active\b|\bactive\s+(?:curator|playlist|profile)\b|\blast active\s*(?:today|yesterday|[0-9]{1,2}\s+(?:hours?|days?)\s+ago)\b|\bactive within (?:[0-9]{1,2} days?|30 days)\b|\bcurrently active\b/i.test(text);
+ const recentActivity=text.match(/\b(?:seen|last active|last updated|updated)\s+(?:within\s+)?([0-9]{1,2})\s*(minutes?|hours?|days?)\s+ago\b/i);
+ const recentActivityDays=recentActivity?Number(recentActivity[1])*(/minute/i.test(recentActivity[2])?1/1440:/hour/i.test(recentActivity[2])?1/24:1):Infinity;
+ const explicitRecentUpdate=/\bupdated\s+(?:daily|weekly|monthly|regularly|every\s+(?:day|week|month))\b/i.test(text);
+ const activeEvidence=/(?:status|curator status|playlist status|account status|activity_status)\s*["']?\s*[:=\-]?\s*["']?active\b|\bactive\s+(?:curator|playlist|profile)\b|\blast active\s*(?:today|yesterday|[0-9]{1,2}\s+(?:hours?|days?)\s+ago)\b|\bactive within (?:[0-9]{1,2} days?|30 days)\b|\bcurrently active\b/i.test(text)||recentActivityDays<=30||explicitRecentUpdate;
  const inactiveEvidence=/\b(?:inactive|paused|closed|disabled|not active)\b/i.test(text);
  return {followerCount,responseRate,activityStatus:activeEvidence&&!inactiveEvidence?"active":"unknown",activeEvidence,inactiveEvidence};
 }
@@ -253,11 +259,21 @@ function evidence(category,title,snippet,html,url,routeOverride=null){
 }
 async function findIndependentCorroboration(category,name,primaryUrl,playlistUrl,dspName,hits,budget){
  const primaryHost=hostnameOf(primaryUrl),primaryDomain=registrableDomain(primaryUrl);
+ // Broad searches commonly return only the publisher itself. Run a bounded
+ // identity-specific search for a second independent mention of this playlist.
+ let corroborationHits=[...(hits||[])];
+ if(budget?.searchesRemaining>0){
+  budget.searchesRemaining--;budget.searchesUsed=(budget.searchesUsed||0)+1;
+  const cleanName=String(name||"").replace(/["\\]/g," ").replace(/\s+/g," ").trim().slice(0,120);
+  const playlistId=String(playlistUrl||"").match(/\/playlist\/([A-Za-z0-9]+)/i)?.[1]||"";
+  const identityQuery=playlistId?`"${cleanName}" "${playlistId}"`:`"${cleanName}" Spotify playlist curator`;
+  try{const extra=await search(identityQuery);corroborationHits=[...extra.items,...corroborationHits];}catch{}
+ }
  const terms=String(name||"").toLowerCase().split(/[^a-z0-9]+/i).filter(x=>x.length>3&&!["playlist","music","official","curated","best","with","from","that"].includes(x)).slice(0,6);
  if(!primaryHost||!primaryDomain||!terms.length)return {ok:false,reason:"Insufficient identity terms for independent corroboration"};
  if(!budget||budget.remaining<=0)return {ok:false,reason:"Per-run independent inspection budget exhausted"};
  let attemptsForCandidate=0;
- for(const hit of (hits||[]).slice(0,20)){
+ for(const hit of corroborationHits.slice(0,40)){
   const candidate=hit.link,host=hostnameOf(candidate),domain=registrableDomain(candidate);
   if(!host||!isSafePublicHttpUrl(candidate)||!domain||domain===primaryDomain)continue;
   const searchable=(String(hit.title||"")+" "+String(hit.snippet||"")).toLowerCase();
@@ -283,7 +299,7 @@ async function main(){
   if(!autoPublicationEnabled)console.log("AUTOPUBLISH_DISABLED: publication policy version 2 is not active; qualified candidates will remain private.");
  }catch(e){autoPublicationEnabled=false;console.log("AUTOPUBLISH_DISABLED: migrations 0028-0029 are not active; discovery will continue without public publication. "+String(e.message||e).slice(0,250));}
  const runRows=await rest("hourly_opportunity_discovery_runs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({status:"running"})});
- const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:10};const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
+ const runId=runRows[0].id;let seen=0,queued=0,rejected=0,duplicates=0,done=0;const corroborationBudget={remaining:10,searchesRemaining:4,searchesUsed:0};const providerDiagnostics={};const duplicateDetails=[];const rejectedDetails=[];const queuedDetails=[];const errors=[];const providerStats={};const processedByCategory={};const categorySeen=new Set();
  for(const item of activeQueries){
   try{
    const searchLocation=item.region||playlistRegions[queryRotationIndex%playlistRegions.length];
@@ -431,7 +447,7 @@ async function main(){
  await rest("hourly_opportunity_discovery_runs?id=eq."+runId,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
   finished_at:now(),status,searches_run:done,candidates_seen:seen,records_added:queuedDetails.filter(x=>x.status==="published").length,records_updated:0,
   records_rejected:rejected,error_summary:errors.join(" | ").slice(0,3000)||null})});
- console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||"Global"),searchProvider:"Bing RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
+ console.log(JSON.stringify({runId,status,searchesRun:done,searchesPerRun:activeQueries.length,queryRotationIndex,queryPoolSize:queries.length,queryTexts:activeQueries.map(x=>x.q),queryLocations:activeQueries.map(x=>x.region||"Global"),searchProvider:"Bing RSS (free)",playlistDiscoveryTarget:18000,playlistSearchRegions:playlistRegions,providers:providerStats,corroborationInspectionsRemaining:corroborationBudget.remaining,corroborationSearchesUsed:corroborationBudget.searchesUsed,candidatesSeen:seen,candidatesQueued:queued,recordsPublished:queuedDetails.filter(x=>x.status==="published").length,recordsRejected:rejected,duplicatesSkipped:duplicates,unaccounted:Math.max(0,seen-queued-rejected-duplicates),providerDiagnostics,duplicateDetails,rejectedDetails,queuedDetails,errors},null,2));
  if(!done)process.exitCode=1;
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
