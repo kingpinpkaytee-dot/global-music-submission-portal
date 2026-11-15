@@ -107,6 +107,8 @@ test("Google and Spotify OAuth sign-in use the Supabase OAuth providers", () => 
   assert.ok(html.includes('id="spotifySignIn"'));
   assert.ok(html.includes('id="spotifyNotice"'));
   assert.ok(auth.includes('scopes: "user-read-email"'));
+  assert.ok(auth.includes("window.location.origin + window.location.pathname + window.location.search"));
+  assert.ok(!auth.includes('/?view=account&authRequired=submission'), "ordinary sign-ins must not be forced to the submissions page");
 });
 
 test("Premium pricing routes from public navigation and dashboard", () => {
