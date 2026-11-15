@@ -87,6 +87,28 @@ test("internal Artist Frequency navigation always replaces the current tab", () 
   assert.equal(openedUrl?.url, "https://open.spotify.com/playlist/example");
 });
 
+
+test("music submission requires authentication and redirects to sign-in without sending", () => {
+  assert.ok(app.includes('if (!currentUser && id === "submissionForm")'));
+  assert.ok(app.includes('sessionStorage.setItem("artistFrequencyAuthReturn", "submissions")'));
+  assert.ok(app.includes('?view=account&authRequired=submission'));
+  assert.ok(app.includes("Please sign in before submitting music. No submission has been sent."));
+  const start = app.indexOf("function attachBackendForm(id, handler)");
+  const end = app.indexOf("\nfunction isEligiblePublicPlaylist", start);
+  const guard = app.slice(start, end);
+  assert.ok(guard.indexOf('if (!currentUser && id === "submissionForm")') < guard.indexOf("await handler(event)"));
+  assert.ok(guard.includes("window.location.assign"));
+});
+
+test("Google and Spotify OAuth sign-in use the Supabase OAuth providers", () => {
+  assert.ok(auth.includes('provider: "google"'));
+  assert.ok(auth.includes('provider: "spotify"'));
+  assert.ok(html.includes('id="googleSignIn"'));
+  assert.ok(html.includes('id="spotifySignIn"'));
+  assert.ok(html.includes('id="spotifyNotice"'));
+  assert.ok(auth.includes('scopes: "user-read-email"'));
+});
+
 test("Premium pricing routes from public navigation and dashboard", () => {
   assert.ok(html.includes('href="#premium-access"'));
   assert.ok(html.includes('id="premium-access"'));
