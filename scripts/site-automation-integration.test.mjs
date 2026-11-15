@@ -102,6 +102,11 @@ test("discovery prioritizes first-party curator sources and runs bounded indepen
   assert.ok(worker.includes("site:qrtrplaylists.com"));
   assert.ok(worker.includes("site:pitchplaylists.com"));
   assert.ok(worker.includes("site:dailyplaylists.com/blog"));
+  assert.ok(worker.includes('expectedDomain:"housemusicwithlove.com"'));
+  assert.ok(worker.includes('expectedDomain:"qrtrplaylists.com"'));
+  assert.ok(worker.includes('expectedDomain:"pitchplaylists.com"'));
+  assert.ok(worker.includes('expectedDomain:"dailyplaylists.com"'));
+  assert.ok(worker.includes("sourceQueryDiagnostics.push"));
   assert.ok(worker.includes("play.google.com"));
   assert.ok(worker.includes("crazygames.com"));
   const querySource = worker.slice(worker.indexOf("const playlistQueries="), worker.indexOf("const queries="));
