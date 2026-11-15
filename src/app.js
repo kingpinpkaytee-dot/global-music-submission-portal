@@ -1078,6 +1078,11 @@ async function initialise() {
     setMessage("authResult", error.message || "Could not restore your session.", true);
   } else {
     await updateSessionUser(data.session?.user || null);
+    const postAuthNotice = sessionStorage.getItem("artistFrequencyPostAuthNotice");
+    if (postAuthNotice && byId("formResult")) {
+      sessionStorage.removeItem("artistFrequencyPostAuthNotice");
+      setMessage("formResult", postAuthNotice);
+    }
   }
 }
 
