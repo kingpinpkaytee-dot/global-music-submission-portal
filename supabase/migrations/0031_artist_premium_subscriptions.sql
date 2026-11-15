@@ -41,6 +41,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS artist_subscriptions_one_current_per_artist_id
   ON public.artist_subscriptions(artist_id)
   WHERE status IN ('pending_payment','active','non_renewing','attention');
 
+-- A single ledger row is awarded for each distinct successful monthly Paystack payment.
+-- This allows 10 credits on the first charge and 10 on each genuine renewal without duplication.
+CREATE TABLE IF NOT EXISTS public.artist_subscription_credit_grants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id uuid NOT NULL REFERENCES public.artist_subscriptions(id) ON DELETE RESTRICT,
+  artist_id uuid NOT NULL REFERENCES public.artist_profiles(id) ON DELETE RESTRICT,
+  provider_payment_reference text NOT NULL UNIQUE,
+  credit_ledger_reference uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  credit_quantity integer NOT NULL DEFAULT 10 CHECK (credit_quantity = 10),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.artist_subscription_credit_grants ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.artist_subscription_credit_grants FROM PUBLIC, anon, authenticated;
+GRANT ALL PRIVILEGES ON TABLE public.artist_subscription_credit_grants TO service_role;
+
 ALTER TABLE public.artist_subscriptions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Artists read own subscription status" ON public.artist_subscriptions;
 CREATE POLICY "Artists read own subscription status"
@@ -71,9 +86,10 @@ DECLARE
   v_subscription public.artist_subscriptions%ROWTYPE;
   v_paid_at timestamptz := coalesce(p_paid_at, now());
   v_until timestamptz := coalesce(p_next_payment_date, coalesce(p_paid_at, now()) + interval '1 month');
+  v_credit_reference uuid;
 BEGIN
   IF p_amount_minor <> 9900 OR p_currency <> 'ZAR'
-     OR (nullif(p_provider_reference, '') IS NULL AND nullif(p_subscription_code, '') IS NULL) THEN
+     OR nullif(p_provider_reference, '') IS NULL THEN
     RAISE EXCEPTION 'Verified Premium payment details are invalid';
   END IF;
 
@@ -107,9 +123,29 @@ BEGIN
       updated_at = now()
   WHERE id = v_subscription.id;
 
+  INSERT INTO public.artist_subscription_credit_grants (
+    subscription_id, artist_id, provider_payment_reference
+  ) VALUES (
+    v_subscription.id, v_subscription.artist_id, p_provider_reference
+  )
+  ON CONFLICT (provider_payment_reference) DO NOTHING
+  RETURNING credit_ledger_reference INTO v_credit_reference;
+
+  IF v_credit_reference IS NOT NULL THEN
+    INSERT INTO public.credit_ledger (
+      artist_id, amount, entry_type, reference_id, description
+    ) VALUES (
+      v_subscription.artist_id,
+      10,
+      'purchase_grant',
+      v_credit_reference,
+      '10 Premium membership credits for verified Paystack payment ' || p_provider_reference
+    );
+  END IF;
+
   RETURN true;
 END;
-$$;
+$;
 
 REVOKE ALL ON FUNCTION public.settle_artist_premium_subscription_payment(text,text,bigint,text,timestamptz,timestamptz)
   FROM PUBLIC, anon, authenticated;

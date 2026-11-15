@@ -1,13 +1,54 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes)).map(value => value.toString(16).padStart(2, "0")).join("");
-async function validSignature(raw: string, signature: string, secret: string) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
-  const digest = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw)));
-  if (digest.length !== signature.length) return false;
+function constantTimeHexEqual(expected: string, supplied: string) {
+  if (!/^[0-9a-f]{128}$/i.test(supplied) || expected.length !== supplied.length) return false;
+  const lower = supplied.toLowerCase();
   let diff = 0;
-  for (let i = 0; i < digest.length; i++) diff |= digest.charCodeAt(i) ^ signature.charCodeAt(i);
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ lower.charCodeAt(i);
   return diff === 0;
+}
+async function hmacSha512Hex(secret: string, payload: Uint8Array) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
+  return hex(await crypto.subtle.sign("HMAC", key, payload));
+}
+async function validPaystackSignature(rawBody: Uint8Array, headers: Headers, webhookSecret: string, apiSecret: string) {
+  // Current Paystack signature: HMAC-SHA512(timestamp + "." + raw body), keyed by whsec_.
+  const modernHeader = headers.get("paystack-signature") || "";
+  if (modernHeader && webhookSecret) {
+    let timestamp = "";
+    const signatures: string[] = [];
+    let malformed = false;
+    for (const part of modernHeader.split(",")) {
+      const separator = part.indexOf("=");
+      if (separator < 0) continue;
+      const key = part.slice(0, separator).trim();
+      const value = part.slice(separator + 1).trim();
+      if (key === "t") {
+        if (timestamp || !/^[0-9]+$/.test(value)) malformed = true;
+        else timestamp = value;
+      } else if (key === "v1") {
+        const keySeparator = value.indexOf(":");
+        if (keySeparator > 0) signatures.push(value.slice(keySeparator + 1));
+      }
+    }
+    const signedAt = Number(timestamp);
+    const now = Math.floor(Date.now() / 1000);
+    if (!malformed && timestamp && Number.isSafeInteger(signedAt) && Math.abs(now - signedAt) <= 300 && signatures.length) {
+      const prefix = new TextEncoder().encode(timestamp + ".");
+      const payload = new Uint8Array(prefix.length + rawBody.length);
+      payload.set(prefix, 0);
+      payload.set(rawBody, prefix.length);
+      const expected = await hmacSha512Hex(webhookSecret, payload);
+      if (signatures.some(signature => constantTimeHexEqual(expected, signature))) return true;
+    }
+  }
+
+  // Legacy x-paystack-signature: raw-body HMAC using the API secret during migration.
+  const legacyHeader = headers.get("x-paystack-signature") || "";
+  if (!legacyHeader || !apiSecret) return false;
+  const expected = await hmacSha512Hex(apiSecret, rawBody);
+  return constantTimeHexEqual(expected, legacyHeader);
 }
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -20,10 +61,11 @@ Deno.serve(async request => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   if (!secret || !url || !serviceKey) return response({ error: "Webhook is not configured" }, 503);
 
-  const raw = await request.text();
-  const signature = request.headers.get("x-paystack-signature") || "";
-  if (!signature || !await validSignature(raw, signature, secret)) return response({ error: "Invalid signature" }, 401);
-
+  const rawBody = new Uint8Array(await request.arrayBuffer());
+  if (!await validPaystackSignature(rawBody, request.headers, Deno.env.get("PAYSTACK_WEBHOOK_SECRET") || "", secret)) {
+    return response({ error: "Invalid signature" }, 401);
+  }
+  const raw = new TextDecoder().decode(rawBody);
   let event: any;
   try { event = JSON.parse(raw); } catch { return response({ error: "Invalid JSON" }, 400); }
   const data = event?.data || {};

@@ -20,6 +20,12 @@ const cancelPremiumFunction = read("../supabase/functions/cancel-premium-subscri
 const paymentAdminFunction = read("../supabase/functions/payment-admin-status/index.ts");
 const paystackWebhookFunction = read("../supabase/functions/paystack-webhook/index.ts");
 const supabaseConfig = read("../supabase/config.toml");
+const premiumMigration31 = read("../supabase/migrations/0031_artist_premium_subscriptions.sql");
+const createPremiumFunction = read("../supabase/functions/create-premium-subscription/index.ts");
+const cancelPremiumFunction = read("../supabase/functions/cancel-premium-subscription/index.ts");
+const paymentAdminFunction = read("../supabase/functions/payment-admin-status/index.ts");
+const paystackWebhookFunction = read("../supabase/functions/paystack-webhook/index.ts");
+const supabaseConfig = read("../supabase/config.toml");
 const workflow = read("../.github/workflows/hourly-opportunity-discovery.yml");
 
 test("embedded website routing scripts parse as JavaScript", () => {
@@ -144,14 +150,21 @@ test("Premium checkout is accessible only through the sandbox-gated server flow"
   assert.ok(!html.includes("Premium activation pending"));
 });
 
-test("Premium subscription database and webhook enforce verified paid membership", () => {
+test("Premium subscription database, credits and webhook enforce verified paid membership", () => {
   assert.ok(premiumMigration31.includes("CREATE TABLE IF NOT EXISTS public.artist_subscriptions"));
   assert.ok(premiumMigration31.includes("provider_email_token"));
   assert.ok(premiumMigration31.includes("GRANT SELECT ("));
   assert.ok(premiumMigration31.includes("settle_artist_premium_subscription_payment"));
+  assert.ok(premiumMigration31.includes("artist_subscription_credit_grants"));
+  assert.ok(premiumMigration31.includes("credit_quantity integer NOT NULL DEFAULT 10"));
+  assert.ok(premiumMigration31.includes("10 Premium membership credits"));
+  assert.ok(premiumMigration31.includes("'purchase_grant'"));
   assert.ok(premiumMigration31.includes("TO service_role"));
   assert.ok(paystackWebhookFunction.includes("HMAC"));
   assert.ok(paystackWebhookFunction.includes("SHA-512"));
+  assert.ok(paystackWebhookFunction.includes("paystack-signature"));
+  assert.ok(paystackWebhookFunction.includes("PAYSTACK_WEBHOOK_SECRET"));
+  assert.ok(paystackWebhookFunction.includes("Math.abs(now - signedAt) <= 300"));
   assert.ok(paystackWebhookFunction.includes("x-paystack-signature"));
   assert.ok(paystackWebhookFunction.includes("transaction/verify/"));
   assert.ok(paystackWebhookFunction.includes("Number(verified.amount) !== 9900"));

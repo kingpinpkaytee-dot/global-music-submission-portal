@@ -160,3 +160,55 @@ The CORS allow-list contains the exact production website origins, the Artist Fr
 - Invalid signatures, unknown references, wrong amounts, wrong currency and duplicate events never create or extend a membership.
 - Cancellation preserves paid access to the recorded end date and prevents renewal.
 - Live card billing remains disabled during the preview testing phase.
+
+
+## Recurring Premium membership — sandbox implementation
+
+The recurring Premium membership is a separate Paystack subscription product. It does not reuse the one-time invoice checkout.
+
+- Product: Artist Frequency Premium — **ZAR 99.00 monthly** (9,900 cents).
+- Payment method: recurring bank-card authorization. Paystack subscriptions support cards; Direct Debit is only available in Nigeria. EFT and Capitec Pay are not recurring membership methods. See the Paystack Subscriptions documentation.
+- The administrator's Payment Centre verifies the merchant API key and creates/reuses the R99 monthly ZAR Test Mode plan. Its non-secret plan code is stored in `payment_provider_accounts.capabilities`.
+- Artist flow: authenticated user → pending local subscription row → Paystack hosted checkout initialized with the stored plan → secure hosted card authorization.
+- Entitlement: a browser return URL never activates Premium. The webhook verifies Paystack's signature, verifies transaction status/reference/amount/currency with Paystack, then calls the service-role-only settlement RPC.
+- Each distinct successful monthly payment grants **10 Premium credits exactly once**, using a provider-payment-reference idempotency table and the existing `purchase_grant` credit ledger entry type.
+- Cancellation uses the server-only Paystack subscription code and email token. The token is never selected to the browser. Renewal is stopped while access remains available through the paid period.
+- Renewal processing supports `invoice.update`, `invoice.payment_failed`, `subscription.not_renew`, `subscription.disable` and `charge.success`. Unprocessed event types (including Paystack endpoint ping) are acknowledged without granting access.
+- Environment guard: `create-premium-subscription` only accepts `sk_test_` by default. Live keys are rejected unless `PAYSTACK_ALLOW_LIVE_PREMIUM=true` is deliberately enabled after formal release approval.
+
+### Webhook signature configuration
+
+Paystack's current signing format uses the `Paystack-Signature` header and a webhook signing secret beginning `whsec_`. The webhook function validates HMAC-SHA512 over `timestamp + "." + raw request body`, rejects timestamps outside 300 seconds, and compares the hex signature in constant time. Configure `PAYSTACK_WEBHOOK_SECRET` from Paystack Dashboard → Developers → API configuration. A legacy `x-paystack-signature` check using `PAYSTACK_SECRET_KEY` remains available during migration. Keep the API secret because it is also needed to verify transactions through the Paystack API. Do not store either secret in Git or browser JavaScript.
+
+### Recurring membership migration and Edge Functions
+
+Migration `0031_artist_premium_subscriptions.sql` creates the membership table, keeps the Paystack email token server-only, adds the unique monthly credit-grant ledger and exposes the settlement RPC only to `service_role`.
+
+Additional functions:
+
+- `create-premium-subscription` — authenticated artist only; fixed R99 plan, no browser-supplied amount or plan code.
+- `cancel-premium-subscription` — authenticated owner only; email token remains server-side.
+- `payment-admin-status` — verifies Paystack credentials and prepares/reuses the R99 ZAR monthly Test Mode plan.
+- `paystack-webhook` — HMAC signature verification (current `Paystack-Signature` and legacy `x-paystack-signature`); Supabase JWT verification is disabled only for this provider callback.
+
+### Sandbox deployment sequence
+
+1. Confirm migrations 0017 and 0018 are applied, then apply migration 0031 after migration 0030. Do not run a broad database push until the remote migration history is checked.
+2. In Supabase Edge Function Secrets set `PAYSTACK_SECRET_KEY` to the Paystack **Test Mode** secret and `PAYSTACK_WEBHOOK_SECRET` to the current `whsec_` webhook signing secret. Never send either value through chat or commit them.
+3. Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. The website origins are allow-listed in the payment functions; `CORS_ALLOWED_ORIGINS` can be used for additional exact origins.
+4. Deploy `payment-admin-status`, `create-premium-subscription`, `cancel-premium-subscription`, `create-paystack-checkout` and `paystack-webhook`. The Supabase config sets `verify_jwt=false` only for the Paystack webhook.
+5. Sign in as the platform administrator on the feature preview and use **Check Paystack connection**. Confirm `connected`, `TEST` and `premium_plan_ready=true`.
+6. Register webhook URL `https://mdcvewnevgsgmyfnybgn.supabase.co/functions/v1/paystack-webhook` in Paystack Test Mode and enable the recurring charge/subscription events.
+7. Complete a test card checkout. Confirm subscription status changes only after a verified webhook and exactly 10 credits are granted. Test duplicate webhook, failed charge, cancellation, renewal success and renewal failure.
+8. Keep live billing locked. Do not set `PAYSTACK_ALLOW_LIVE_PREMIUM=true` or deploy live keys until all sandbox tests and merchant setup are formally approved.
+
+### Sandbox acceptance criteria
+
+- Unauthenticated browser cannot create or cancel a membership.
+- Each artist can read only non-sensitive membership columns for their own account.
+- Browser cannot choose the plan price, plan code, currency, artist ID or status.
+- Browser return alone never grants Premium.
+- Wrong amount, currency, event signature, old timestamp, unknown reference and duplicate payment never activate or extend membership.
+- Exactly 10 credits are granted once per distinct successful monthly payment.
+- Cancellation preserves the existing paid-through date and disables future renewal.
+- Live card billing remains locked during the preview phase.
