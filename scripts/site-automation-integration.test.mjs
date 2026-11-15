@@ -22,6 +22,29 @@ test("embedded website routing scripts parse as JavaScript", () => {
   for (const [, source] of scripts) new vm.Script(source, { filename: "index.html:inline-script" });
 });
 
+test("internal Artist Frequency navigation always replaces the current tab", () => {
+  const internalRouteAnchors = [...html.matchAll(/<a\\b[^>]*href=["']\\?view=[^"']+["'][^>]*>/gi)].map(match => match[0]);
+  assert.ok(internalRouteAnchors.length >= 10, "expected dashboard, workspace and navigation route links");
+  for (const anchor of internalRouteAnchors) {
+    assert.doesNotMatch(anchor, /target=["'](?:_blank|artistFrequencyPopup)["']/i, anchor);
+  }
+  assert.ok(!html.includes('brand.target = "_blank"'), "brand navigation must not force a new tab");
+  const navInjectionAt = html.indexOf("navActions.innerHTML");
+  assert.ok(navInjectionAt >= 0, "focused-view navigation must still be generated");
+  const navInjection = html.slice(navInjectionAt, navInjectionAt + 400);
+  assert.doesNotMatch(navInjection, /target=["'](?:_blank|artistFrequencyPopup)["']/i);
+
+  const handlerStart = app.indexOf('document.addEventListener("click"');
+  const handlerEnd = app.indexOf("const byId", handlerStart);
+  assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, "same-origin navigation handler must exist");
+  const handler = app.slice(handlerStart, handlerEnd);
+  assert.ok(handler.includes("destination.origin === window.location.origin"));
+  assert.ok(handler.includes("if (isInternalRoute)"));
+  assert.ok(handler.includes("window.location.assign(destination.href)"));
+  assert.ok(handler.indexOf("if (isInternalRoute)") < handler.indexOf("window.open("),
+    "same-origin route handling must occur before any popup creation");
+});
+
 test("Premium pricing routes from public navigation and dashboard", () => {
   assert.ok(html.includes('href="#premium-access"'));
   assert.ok(html.includes('id="premium-access"'));
