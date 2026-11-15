@@ -82,6 +82,59 @@ The worker log contained neither `AUTOPUBLISH_DISABLED` nor `PGRST205`, and the 
 
 **No new playlist was published in run #78.** All 20 search results failed one or more evidence requirements, mainly because they were generic pages or lacked explicit activity, response-rate and independently verified HTTPS submission-route evidence. Since no candidate was queued, this run did not exercise a successful publication insert; a future qualifying candidate is still needed to verify a new row end to end.
 
+## Discovery-source quality work — 15 November 2026
+
+### Implemented
+
+The worker's search pool now places first-party and curator-controlled sources first:
+
+- House Music With Love's official Spotify playlist submission page.
+- QRTR's free pitch page.
+- Pitchplaylists' curator catalogue.
+- DailyPlaylists' Amapiano playlist roundups.
+
+Search phrases no longer require follower and response metrics to appear in search snippets; those metrics are checked on the inspected publisher page. The worker retains the 15+ follower, active-status, numeric 0.5%–100% response-rate, individual Spotify playlist, HTTPS submission-route and independent-corroboration gates.
+
+Targeted `site:` queries now carry an expected source domain. Results returned from another domain are discarded before inspection. Generic noise exclusions were expanded to cover common game stores, game sites, app stores, dictionaries and Wikipedia.
+
+Integration tests assert the source priority, expected-domain filtering, expanded noise list and unchanged hard qualification rules.
+
+Relevant commits:
+- `9952ce1137cf7dedb29df957ddbb97cf4ea0b867` — add additional restricted automated-collection domains.
+- `1067ce155a50316f88bbe2e1d5af09c722f5621a` — test the restricted-source list.
+- `39353ec8a1af01b83d0681b6d2a374beeb7a43cb` — broaden search queries and add bounded identity corroboration.
+- `0cf0c97e45ed7386b536e587bbc8a5977dc3ae41` — fix query-array syntax; workflow run #84 passed.
+- `a94b9bfbec20faba1d517a5f5d1dacc45a5e4046` — prioritize first-party source queries and extend noise filters.
+- `20f0b7ef503f5908991080bd0113600f42cd42e3` — correct query-array terminator; workflow run #87 passed.
+- `1ef84db20f344a19668445bc42ee508386983dc9` — enforce exact host matching for source-restricted queries.
+- `6a2d619855dfd67150f42b7d6c13e79a9b39f9c7` — add integration coverage for source host filtering.
+
+### Verified result — workflow run #89
+
+Run ID: `43754054882`
+
+- Workflow: **success**
+- Four searches executed.
+- Seven candidates seen.
+- Zero queued.
+- Zero published.
+- Seven rejected.
+- Zero duplicates.
+- Zero errors.
+- No `AUTOPUBLISH_DISABLED` or `PGRST205`.
+
+The two first-party site-restricted searches returned 7 and 10 Bing RSS results respectively, but **zero results matched the expected source domains**. Those mismatches were discarded before page inspection. The two broad regional searches returned seven results each, but they resolved to Spotify landing/login/download pages and no candidate passed the evidence gates.
+
+This establishes that expected-domain filtering is working, but the current Bing RSS results are not providing usable, relevant search results. The 15+ threshold did not cause this failure; the provider did not surface qualifying curator pages.
+
+### Provider decision
+
+The worker still uses the free Bing RSS endpoint. Microsoft's Bing Search APIs were retired in August 2025; the worker's RSS feed is not a substitute for a supported, high-quality search API.
+
+A replacement must allow the portal to store the discovered URLs and derived verification records. Search providers with no-storage restrictions are unsuitable for this database workflow. Mojeek's published pricing currently advertises storage rights on its Business plan at £3 per 1,000 requests; the lower Startup plan does not include indefinite storage rights. Do not enable a paid provider or add an API secret until the operator explicitly approves the budget and credentials.
+
+No unverified listings were inserted into the public directory. No production deployment or protection setting was changed.
+
 ## Preview
 
 The protected Vercel preview is READY at:
