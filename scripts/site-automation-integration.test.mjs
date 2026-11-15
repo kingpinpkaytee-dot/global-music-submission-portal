@@ -126,7 +126,7 @@ test("Premium pricing routes from public navigation and dashboard", () => {
   assert.ok(html.includes('id="premiumSubscribeButton"'));
   assert.ok(html.includes('id="premiumMembershipStatus"'));
   assert.ok(html.includes("R99"));
-  assert.ok(html.includes("PRE-LAUNCH STATUS"));
+  assert.ok(html.includes("SANDBOX TESTING"));
 });
 
 test("Premium checkout is accessible only through the sandbox-gated server flow", () => {
