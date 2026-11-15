@@ -2,24 +2,36 @@ import { supabase, isSupabaseConfigured } from "./supabase-client.js";
 
 window.artistFrequencyBackendActive = true;
 
-// Keep all task and opportunity links inside one reusable popup window.
-// The opener is detached immediately to prevent reverse-tab navigation.
+// Internal Artist Frequency navigation must always replace the current tab.
+// Only genuine off-site links marked for a new window use the reusable external popup.
 document.addEventListener("click", event => {
   const anchor = event.target.closest("a[href]");
   if (!anchor) return;
   const raw = anchor.getAttribute("href") || "";
   if (!raw || raw.startsWith("#") || raw.startsWith("mailto:") || raw.startsWith("tel:")) return;
-  const isNewWindow = anchor.target === "_blank" || anchor.target === "artistFrequencyPopup";
-  if (!isNewWindow) return;
+
   let destination;
   try { destination = new URL(raw, window.location.href); } catch { return; }
   if (!["http:", "https:"].includes(destination.protocol)) return;
+
+  const requestsSeparateWindow = anchor.target === "_blank" || anchor.target === "artistFrequencyPopup";
+  const isInternalRoute = destination.origin === window.location.origin;
+
+  if (isInternalRoute) {
+    if (requestsSeparateWindow) {
+      event.preventDefault();
+      window.location.assign(destination.href);
+    }
+    return;
+  }
+
+  if (!requestsSeparateWindow) return;
   event.preventDefault();
-  const popup = window.open(destination.href, "ArtistFrequencyPopup", "popup=yes,width=1180,height=850,resizable=yes,scrollbars=yes");
+  const popup = window.open(destination.href, "ArtistFrequencyExternal", "popup=yes,width=1180,height=850,resizable=yes,scrollbars=yes");
   if (popup) {
     try { popup.opener = null; popup.focus(); } catch {}
   } else {
-    window.location.href = destination.href;
+    window.location.assign(destination.href);
   }
 }, true);
 
