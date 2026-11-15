@@ -13,6 +13,7 @@ const auth = read("../src/auth.js");
 const worker = read("./hourly-opportunity-discovery.mjs");
 const migration28 = read("../supabase/migrations/0028_autonomous_verified_opportunity_publication.sql");
 const migration29 = read("../supabase/migrations/0029_harden_autonomous_playlist_publication.sql");
+const migration30 = read("../supabase/migrations/0030_playlist_minimum_followers_15.sql");
 const workflow = read("../.github/workflows/hourly-opportunity-discovery.yml");
 
 test("embedded website routing scripts parse as JavaScript", () => {
@@ -58,14 +59,14 @@ test("public playlist listings enforce the required metrics and destination URLs
   const eligible = context.isEligiblePublicPlaylist;
   const valid = {
     category: "playlist",
-    follower_count: 101,
+    follower_count: 15,
     response_rate: 0.5,
     activity_status: "active",
     website_url: "https://open.spotify.com/playlist/2OUUjU1AmIw5OoDHk47DAi",
     submission_url: "https://curator.example/submit"
   };
   assert.equal(eligible(valid), true);
-  assert.equal(eligible({ ...valid, follower_count: 100 }), false);
+  assert.equal(eligible({ ...valid, follower_count: 14 }), false);
   assert.equal(eligible({ ...valid, response_rate: 0 }), false);
   assert.equal(eligible({ ...valid, response_rate: 100.1 }), false);
   assert.equal(eligible({ ...valid, activity_status: "unknown" }), false);
@@ -79,10 +80,12 @@ test("playlist statistics enforce the same follower, response and activity thres
   const end = app.indexOf("async function loadDirectory()", start);
   assert.ok(start >= 0 && end > start, "opportunity statistics function must exist");
   const source = app.slice(start, end);
-  assert.ok(source.includes('.gt("follower_count", 100)'));
+  assert.ok(source.includes('.gte("follower_count", 15)'));
   assert.ok(source.includes('.gte("response_rate", 0.5)'));
   assert.ok(source.includes('.lte("response_rate", 100)'));
   assert.ok(source.includes('.eq("activity_status", "active")'));
+  assert.ok(source.includes('.like("website_url", "https://open.spotify.com/playlist/%")'));
+  assert.ok(source.includes('.like("submission_url", "https://%")'));
 });
 
 test("automation stages candidates then invokes the guarded publication RPC", () => {
@@ -90,6 +93,22 @@ test("automation stages candidates then invokes the guarded publication RPC", ()
   assert.ok(worker.includes('rest("rpc/auto_publish_verified_opportunity_candidate"'));
   assert.ok(worker.includes("if(ev.ok&&corroboration.ok&&autoPublicationEnabled)"));
   assert.ok(worker.includes("AUTOPUBLISH_DISABLED"));
+});
+
+test("discovery targets small playlists, accepts 15+ followers and runs four searches hourly", () => {
+  assert.ok(worker.includes("at least 15 followers"));
+  assert.ok(worker.includes('Math.min(4,requestedSearches)'));
+  assert.ok(worker.includes('"small playlist"'));
+  assert.ok(workflow.includes('DISCOVERY_SEARCHES_PER_RUN: "4"'));
+});
+
+test("migration 0030 updates both database follower guards to an inclusive 15 minimum", () => {
+  assert.ok(migration30.includes("candidate.follower_count <= 100"));
+  assert.ok(migration30.includes("candidate.follower_count < 15"));
+  assert.ok(migration30.includes("coalesce((evidence->>'follower_count')::bigint,0) <= 100"));
+  assert.ok(migration30.includes("coalesce((evidence->>'follower_count')::bigint,0) < 15"));
+  assert.ok(migration30.includes("at least 15 followers"));
+  assert.ok(migration30.trimEnd().endsWith("COMMIT;"));
 });
 
 test("publication migrations bridge verified candidates into the website directory", () => {

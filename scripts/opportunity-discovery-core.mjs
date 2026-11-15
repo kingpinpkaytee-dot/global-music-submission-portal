@@ -161,7 +161,7 @@ export function parseDataForSeoResults(data){
 export function qualifiesPlaylist({playlistUrl,followerCount,responseRate,activityStatus,submissionUrl}){
  const failures=[];
  if(!/^https:\/\/open\.spotify\.com\/playlist\/[A-Za-z0-9]+(?:[/?#].*)?$/i.test(String(playlistUrl||"")))failures.push("individual public Spotify playlist URL missing");
- if(!Number.isFinite(Number(followerCount))||Number(followerCount)<=100)failures.push("follower count must be greater than 100");
+ if(!Number.isFinite(Number(followerCount))||Number(followerCount)<15)failures.push("follower count must be at least 15");
  if(activityStatus!=="active")failures.push("active status not explicitly confirmed");
  if(!Number.isFinite(Number(responseRate))||Number(responseRate)<0.5||Number(responseRate)>100)failures.push("response rate must be between 0.5% and 100%");
  if(!isSafePublicHttpUrl(submissionUrl)||!/^https:\/\//i.test(String(submissionUrl||"")))failures.push("HTTPS submission route not independently identified");

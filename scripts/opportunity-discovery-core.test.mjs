@@ -33,16 +33,16 @@ test("blocks automated collection from services whose terms prohibit scraping",(
 test("strict playlist gates accept boundary values and all genres",()=>{
  const result=qualifiesPlaylist({
   playlistUrl:"https://open.spotify.com/playlist/5yzND7XsDIzBYIBKu42LJw",
-  followerCount:101,responseRate:0.5,activityStatus:"active",
+  followerCount:15,responseRate:0.5,activityStatus:"active",
   submissionUrl:"https://curator.example/submit"
  });
  assert.equal(result.ok,true);
  assert.equal(result.score,100);
 });
-test("strict playlist gates reject 100 followers, missing activity, missing response rate and missing route",()=>{
+test("strict playlist gates reject fewer than 15 followers, missing activity, missing response rate and missing route",()=>{
  const result=qualifiesPlaylist({
   playlistUrl:"https://open.spotify.com/playlist/5yzND7XsDIzBYIBKu42LJw",
-  followerCount:100,responseRate:null,activityStatus:"unknown",submissionUrl:null
+  followerCount:14,responseRate:null,activityStatus:"unknown",submissionUrl:null
  });
  assert.equal(result.ok,false);
  assert.equal(result.failures.length,4);

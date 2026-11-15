@@ -97,7 +97,7 @@ function isEligiblePublicPlaylist(item) {
   const playlistUrl = String(item.website_url || "").trim();
   const submissionUrl = String(item.submission_url || "").trim();
   return item.activity_status === "active" &&
-    Number.isFinite(followers) && followers > 100 &&
+    Number.isFinite(followers) && followers >= 15 &&
     Number.isFinite(responseRate) && responseRate >= 0.5 && responseRate <= 100 &&
     /^https:\/\/open[.]spotify[.]com\/playlist\/[A-Za-z0-9]+([/?#].*)?$/i.test(playlistUrl) &&
     /^https:\/\//i.test(submissionUrl);
@@ -202,10 +202,12 @@ async function updateOpportunityStats() {
     .select("id", { count: "exact", head: true })
     .eq("is_public", true).eq("is_active", true).eq("is_verified", true);
   const eligiblePlaylistCount = query => query
-    .gt("follower_count", 100)
+    .gte("follower_count", 15)
     .gte("response_rate", 0.5)
     .lte("response_rate", 100)
-    .eq("activity_status", "active");
+    .eq("activity_status", "active")
+    .like("website_url", "https://open.spotify.com/playlist/%")
+    .like("submission_url", "https://%");
   const requests = Object.entries(categories).map(async ([id, category]) => {
     let query = baseCount().eq("category", category);
     if (category === "playlist") query = eligiblePlaylistCount(query);

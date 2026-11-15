@@ -23,13 +23,13 @@ const playlistRegions=[
  "Jamaica","Trinidad and Tobago","Portugal","Poland"
 ];
 // Playlist-only discovery: all genres, worldwide, across major DSPs and curator platforms.
-// Qualification: strictly more than 100 followers, explicitly active, response rate 0.5%-100%.
+// Qualification: at least 15 followers, explicitly active, response rate 0.5%-100%.
 const playlistQueries=playlistRegions.map(region=>({
  category:"playlist",region,
- q:`("Spotify playlist curator" OR "submit your music") ("followers" OR "response rate" OR "submission form") "${region}" active -jobs -definition -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com -site:playlist.com`
+ q:`("Spotify playlist curator" OR "submit your music" OR "emerging playlist") ("followers" OR "response rate" OR "submission form") ("small playlist" OR "niche playlist" OR "independent curator") "${region}" active -jobs -definition -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com -site:playlist.com`
 }));
 const platformPlaylistQueries=[
- {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist curator" "submission form" "followers" "response rate" -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
+ {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist curator" "submission form" "followers" "response rate" ("small playlist" OR "emerging playlist" OR "niche playlist") -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
  {category:"playlist",dsp:"Independent curator profiles",q:'"submit your music" "Spotify playlist" curator "followers" active -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
  {category:"playlist",dsp:"Independent curator profiles",q:'"Spotify playlist" curator "response rate" "last active" -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
  {category:"playlist",dsp:"Independent curator profiles",q:'"Playlist Followers" "Response Rate" Spotify playlist submissions curator -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com'},
@@ -44,7 +44,7 @@ const platformPlaylistQueries=[
 ];
 const queries=Array.from({length:Math.max(playlistQueries.length,platformPlaylistQueries.length)},(_,i)=>[playlistQueries[i],platformPlaylistQueries[i]].filter(Boolean)).flat();
 const requestedSearches=Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1);
-const searchesPerRun=Number.isFinite(requestedSearches)?Math.max(1,Math.min(2,requestedSearches)):1;
+const searchesPerRun=Number.isFinite(requestedSearches)?Math.max(1,Math.min(4,requestedSearches)):1;
 const queryRotationIndex=(Math.floor(Date.now()/3600000)*searchesPerRun)%queries.length;
 const activeQueries=Array.from({length:searchesPerRun},(_,i)=>queries[(queryRotationIndex+i)%queries.length]);
 const now=()=>new Date().toISOString();
@@ -409,7 +409,7 @@ async function main(){
       metrics_source_url:profileEvidence.profileUrl||finalUrl,metrics_source_domain:registrableDomain(profileEvidence.profileUrl||finalUrl),
       individual_playlist_url:ev.playlistUrl,submission_route_url:ev.submissionUrl,
       follower_count:followerCount,response_rate:responseRate,activity_status:activityStatus,
-      verified_at:now(),verification_method:"deterministic checklist: live publisher page, explicit HTTPS submission route, individual Spotify playlist, >100 followers, active status, 0.5-100% response rate, and an independently reachable second domain matching the same playlist identity"
+      verified_at:now(),verification_method:"deterministic checklist: live publisher page, explicit HTTPS submission route, individual Spotify playlist, at least 15 followers, active status, 0.5-100% response rate, and an independently reachable second domain matching the same playlist identity"
      }:null,auto_verified_at:ev.ok&&corroboration.ok?now():null}:{})};
     const inserted=await rest("opportunity_discovery_candidates",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(candidate)});
     const saved=Array.isArray(inserted)?inserted[0]:null;
