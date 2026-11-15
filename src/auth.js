@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from "./supabase-client.js";
 
 const authResult = document.getElementById("authResult");
 const googleNotice = document.getElementById("googleNotice");
+const spotifyNotice = document.getElementById("spotifyNotice");
 const signOutButton = document.getElementById("signOut");
 const signedInAs = document.getElementById("signedInAs");
 
@@ -100,11 +101,27 @@ if (!isSupabaseConfigured || !supabase) {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin }
+        options: { redirectTo: window.location.origin + "/?view=account&authRequired=submission" }
       });
       if (error) throw error;
     } catch (error) {
       if (googleNotice) googleNotice.textContent = error.message || "Google sign-in could not start.";
+    }
+  });
+
+  document.getElementById("spotifySignIn")?.addEventListener("click", async () => {
+    if (spotifyNotice) spotifyNotice.textContent = "Connecting to Spotify…";
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "spotify",
+        options: {
+          redirectTo: window.location.origin + "/?view=account&authRequired=submission",
+          scopes: "user-read-email"
+        }
+      });
+      if (error) throw error;
+    } catch (error) {
+      if (spotifyNotice) spotifyNotice.textContent = error.message || "Spotify sign-in could not start.";
     }
   });
 
@@ -123,5 +140,8 @@ if (!isSupabaseConfigured || !supabase) {
 
   if (googleNotice) {
     googleNotice.textContent = "Google sign-in requires the Google provider and redirect URL to be enabled in Supabase Auth settings.";
+  }
+  if (spotifyNotice) {
+    spotifyNotice.textContent = "Spotify sign-in requires the Spotify provider and callback URL to be enabled in Supabase Auth settings.";
   }
 }
