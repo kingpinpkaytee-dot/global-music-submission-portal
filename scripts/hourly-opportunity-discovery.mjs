@@ -43,7 +43,7 @@ const platformPlaylistQueries=[
  {category:"playlist",dsp:"Vibe Agency",q:'site:vibeagency.net ("Open in Spotify" OR "Listen on Spotify") ("Afro House" OR "Deep House" OR "Organic House")'},
  {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com ("Spotify" AND playlist) curator feedback'},
  {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submission form" curator electronic music -jobs -dictionary -site:spotify.com'},
- {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" "send your music" OR "send us your music" -jobs -dictionary -site:spotify.com'
+ {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" "send your music" OR "send us your music" -jobs -dictionary -site:spotify.com' }
 ];
 const queries=Array.from({length:Math.max(playlistQueries.length,platformPlaylistQueries.length)},(_,i)=>[playlistQueries[i],platformPlaylistQueries[i]].filter(Boolean)).flat();
 const requestedSearches=Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1);
