@@ -32,19 +32,19 @@ const playlistQueries=playlistRegions.map(region=>({
  q:'("Spotify playlist" OR "open.spotify.com/playlist") ("submit your track" OR "submit music" OR "music submission" OR "curator submission") ("Amapiano" OR "Afro House" OR "Deep House" OR "Afrobeats" OR "House") "'+region+'" -jobs -definition -dictionary -site:facebook.com -site:instagram.com -site:youtube.com -site:submitlink.io -site:submithub.com -site:soundplate.com -site:playlist.com -site:playlistdock.com -site:delaynote.com -site:isitagoodplaylist.com -site:playlistmap.com -site:playlistsupply.com'
 }));
 const platformPlaylistQueries=[
+ {category:"playlist",dsp:"House Music With Love — official playlist submission page",q:'site:housemusicwithlove.com/spotify-playlists "Spotify Playlists" "Followers" "Submit your track"'},
+ {category:"playlist",dsp:"QRTR Playlists — free pitch page",q:'site:qrtrplaylists.com "pitch your music for free" Spotify playlist'},
+ {category:"playlist",dsp:"Pitchplaylists — curator directory",q:'site:pitchplaylists.com Spotify playlist curator playlists followers response rate'},
+ {category:"playlist",dsp:"DailyPlaylists — published Amapiano playlist roundups",q:'site:dailyplaylists.com/blog Amapiano Spotify playlist curator followers'},
  {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" ("submit your track" OR "submit your music") ("Amapiano" OR "Afro House" OR "Deep House" OR "Afrobeats") -jobs -dictionary -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com'},
- {category:"playlist",dsp:"Free playlist submission websites",q:'"free playlist submission" Spotify curator playlist submit music -jobs -dictionary -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com'},
- {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "music submission" "curator" "South Africa" OR Nigeria OR Ghana -jobs -dictionary -site:spotify.com'},
- {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submit a track" "Deep House" OR "Afro House" curator -jobs -dictionary -site:spotify.com'},
- {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submit your music" Amapiano OR Afrobeats curator -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"Free playlist submission websites",q:'"free playlist submission" Spotify curator playlist submit music -jobs -dictionary -site:spotify.com -site:facebook.com -site:instagram.com -site:youtube.com -site:play.google.com -site:poki.com -site:crazygames.com'},
+ {category:"playlist",dsp:"South African independent curator pages",q:'"Spotify playlist" "music submission" curator "South Africa" OR Nigeria OR Ghana -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"Deep House and Afro House curator pages",q:'"Spotify playlist" "submit a track" "Deep House" OR "Afro House" curator -jobs -dictionary -site:spotify.com'},
+ {category:"playlist",dsp:"Amapiano and Afrobeats curator pages",q:'"Spotify playlist" "submit your music" Amapiano OR Afrobeats curator -jobs -dictionary -site:spotify.com'},
  {category:"playlist",dsp:"Recently updated curator playlists",q:'"Spotify playlist" curator "updated weekly" OR "updated monthly" "submit music" -jobs -dictionary -site:spotify.com'},
- {category:"playlist",dsp:"QRTR Playlists",q:'site:qrtrplaylists.com ("Spotify" OR playlist) ("pitch your music" OR "submit")'},
- {category:"playlist",dsp:"Indiemono",q:'site:indiemono.com ("Spotify playlist" OR "playlists") ("followers" OR "submit your music")'},
- {category:"playlist",dsp:"Vibe Agency",q:'site:vibeagency.net ("Open in Spotify" OR "Listen on Spotify") ("Afro House" OR "Deep House" OR "Organic House")'},
- {category:"playlist",dsp:"Pitchplaylists",q:'site:pitchplaylists.com ("Spotify" AND playlist) curator feedback'},
  {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submission form" curator electronic music -jobs -dictionary -site:spotify.com'},
  {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" "send your music" OR "send us your music" -jobs -dictionary -site:spotify.com' }
-];
+]
 const queries=Array.from({length:Math.max(playlistQueries.length,platformPlaylistQueries.length)},(_,i)=>[playlistQueries[i],platformPlaylistQueries[i]].filter(Boolean)).flat();
 const requestedSearches=Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1);
 const searchesPerRun=Number.isFinite(requestedSearches)?Math.max(1,Math.min(4,requestedSearches)):1;
@@ -332,7 +332,7 @@ async function main(){
      rejectedDetails.push({category:item.category,name:"Excluded source",url,provider:hit.provider||"unknown",evidenceReason:"Source terms restrict automated data collection, scraping or non-US use; no page content collected"});
      rejected++;continue;
     }
-    const noiseHosts=["dictionary.cambridge.org","cambridge.org","merriam-webster.com","vocabulary.com","thefreedictionary.com","dictionary.com","submittable.com","facebook.com","instagram.com","youtube.com","accounts.spotify.com","artists.spotify.com","spotify.com","spotify.app.link"];
+    const noiseHosts=["dictionary.cambridge.org","cambridge.org","merriam-webster.com","vocabulary.com","thefreedictionary.com","dictionary.com","submittable.com","facebook.com","instagram.com","youtube.com","accounts.spotify.com","artists.spotify.com","spotify.com","spotify.app.link","play.google.com","poki.com","crazygames.com","freegames.org","freestufffinder.com","microsoft.com","epicgames.com","wikipedia.org"];
     if(noiseHosts.some(domain=>urlHost===domain||urlHost.endsWith("."+domain))){
      rejectedDetails.push({category:item.category,name:"Rejected search result",url,provider:hit.provider||"unknown",evidenceReason:"Excluded generic search-noise, social or streaming-service landing page"});
      rejected++;continue;
