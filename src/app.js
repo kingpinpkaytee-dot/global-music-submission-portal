@@ -90,6 +90,12 @@ function attachBackendForm(id, handler) {
       if (!isSupabaseConfigured || !supabase) {
         throw new Error("The Supabase connection is not configured. Please contact the platform administrator.");
       }
+      if (!currentUser && id === "submissionForm") {
+        sessionStorage.setItem("artistFrequencyAuthReturn", "submissions");
+        window.location.assign(window.location.origin + "/?view=account&authRequired=submission");
+        return;
+      }
+      if (!currentUser) throw new Error("Please sign in before submitting music. No submission has been sent.");
       await handler(event);
     } catch (error) {
       const target = id === "submissionForm" ? "formResult"
@@ -976,6 +982,13 @@ async function updateSessionUser(user) {
     return;
   }
   if (!wasSameUser) await loadArtistWorkspace();
+  const authReturn = sessionStorage.getItem("artistFrequencyAuthReturn");
+  const authRequired = new URLSearchParams(window.location.search).get("authRequired");
+  if (authReturn === "submissions" || authRequired === "submission") {
+    sessionStorage.removeItem("artistFrequencyAuthReturn");
+    sessionStorage.setItem("artistFrequencyPostAuthNotice", "You are signed in. Your music was not submitted automatically; review the form and submit it when ready.");
+    window.location.assign(window.location.origin + "/?view=submissions");
+  }
 }
 
 document.getElementById("filters")?.addEventListener("click", event => {
