@@ -145,7 +145,7 @@ BEGIN
 
   RETURN true;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.settle_artist_premium_subscription_payment(text,text,bigint,text,timestamptz,timestamptz)
   FROM PUBLIC, anon, authenticated;

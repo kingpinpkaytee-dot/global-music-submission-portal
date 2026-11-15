@@ -153,6 +153,7 @@ test("Premium subscription database, credits and webhook enforce verified paid m
   assert.ok(premiumMigration31.includes("provider_email_token"));
   assert.ok(premiumMigration31.includes("GRANT SELECT ("));
   assert.ok(premiumMigration31.includes("settle_artist_premium_subscription_payment"));
+  assert.ok(premiumMigration31.includes("END;\\n$;"), "migration function must use a complete dollar-quote delimiter");
   assert.ok(premiumMigration31.includes("artist_subscription_credit_grants"));
   assert.ok(premiumMigration31.includes("credit_quantity integer NOT NULL DEFAULT 10"));
   assert.ok(premiumMigration31.includes("10 Premium membership credits"));

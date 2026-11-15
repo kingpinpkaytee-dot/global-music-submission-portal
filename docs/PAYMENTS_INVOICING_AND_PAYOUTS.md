@@ -73,7 +73,7 @@ The migration is **not applied to production**. Review and apply it only through
 - Webhook verification and credit fulfilment: not yet implemented.
 - Admin provider-link UI and connection health check: not yet implemented.
 - Artist invoice list/checkout UI: not yet implemented.
-- Provider credentials: not configured.
+- Provider credentials: existing Supabase secrets inventory needs correction; use the exact environment variable names above. A secret entry whose name resembles a key prefix is not a correctly named environment variable.
 - Live payment and payout: disabled.
 
 No invoice can be paid through the platform and no paid credit package can be fulfilled until the server-side checkout, webhook, verification and admin connection work is completed and tested.
@@ -90,7 +90,10 @@ No invoice can be paid through the platform and no paid credit package can be fu
 
 1. Review and apply migrations 0017 and 0018 to Supabase production through the approved migration process.
 2. Add these secrets in Supabase Project → Edge Functions → Secrets:
-   - `PAYSTACK_SECRET_KEY` (start with a test key)
+   - `PAYSTACK_SECRET_KEY` — reserved for the existing invoice-payment provider key; do not change it to test Premium.
+   - `PAYSTACK_PREMIUM_TEST_SECRET_KEY` — separate Paystack Test Mode `sk_test_` key for the R99/month Premium sandbox.
+   - `PAYSTACK_WEBHOOK_SECRET` — existing/live webhook signing secret (`whsec_`).
+   - `PAYSTACK_TEST_WEBHOOK_SECRET` — Test Mode webhook signing secret (`whsec_`).
    - `APP_ORIGIN` (the exact deployed site origin, e.g. `https://artist-frequency.vercel.app`)
    - `CORS_ALLOWED_ORIGINS` (comma-separated exact origins allowed to call browser-facing functions; include only the active production/preview origins)
    - `PAYMENT_RETURN_URL` (an HTTPS URL on the site, e.g. `https://artist-frequency.vercel.app/?view=billing&payment=return`)
@@ -102,7 +105,7 @@ No invoice can be paid through the platform and no paid credit package can be fu
 4. Configure the webhook URL in the Paystack dashboard as:
    `https://mdcvewnevgsgmyfnybgn.supabase.co/functions/v1/paystack-webhook`
 5. Test with Paystack test keys and test transactions. Confirm webhook delivery, invoice paid state, one-time ledger grant, duplicate webhook handling, failed checkout and amount/currency mismatch.
-6. Only after successful sandbox QA, replace the test secret with the live secret and repeat the verification. Keep payouts disabled until Paystack confirms the merchant's South African transfer capability and bank beneficiary checks.
+6. Keep the invoice key and Premium Test key separate. Do not enable live Premium billing or replace the existing invoice key as part of sandbox QA. Keep payouts disabled until Paystack confirms the merchant's South African transfer capability and bank beneficiary checks.
 
 ## Current limits
 
