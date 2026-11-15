@@ -28,8 +28,8 @@ Deno.serve(async request => {
     const url = Deno.env.get("SUPABASE_URL") || "";
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const secret = Deno.env.get("PAYSTACK_SECRET_KEY") || "";
-    if (!url || !anonKey || !serviceKey || !secret) return reply({ error: "Subscription management is not configured." }, 503, origin);
+    const secret = Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRET_KEY") || "";
+    if (!url || !anonKey || !serviceKey || !secret.startsWith("sk_test_")) return reply({ error: "Premium Test Mode subscription management is not configured. Check PAYSTACK_PREMIUM_TEST_SECRET_KEY." }, 503, origin);
 
     const bearer = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     if (!bearer) return reply({ error: "Sign in is required." }, 401, origin);
@@ -41,6 +41,7 @@ Deno.serve(async request => {
     const { data: subscription, error: subscriptionError } = await admin.from("artist_subscriptions")
       .select("id,provider_subscription_code,provider_email_token,status,next_payment_date,paid_through_at")
       .eq("artist_id", authData.user.id)
+      .eq("provider_environment", "test")
       .in("status", ["active","non_renewing","attention"])
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (subscriptionError) throw subscriptionError;

@@ -135,15 +135,15 @@ Additional functions:
 
 - `create-premium-subscription` — authenticated artist, fixed plan/amount, no browser-supplied amount or plan code.
 - `cancel-premium-subscription` — authenticated owner only; Paystack email token is never returned.
-- `payment-admin-status` — validates the Paystack credential and prepares/reuses the Test Mode R99 ZAR monthly plan.
+- `payment-admin-status` — preserves the existing invoice/live key as `PAYSTACK_SECRET_KEY`, validates the separate `PAYSTACK_PREMIUM_TEST_SECRET_KEY`, and prepares/reuses the Test Mode R99 ZAR monthly plan.
 - `paystack-webhook` — HMAC-SHA512 provider callback; configured with `verify_jwt=false` because Paystack signs its callbacks using `x-paystack-signature`, not a Supabase user JWT.
 
-The CORS allow-list contains the exact production website origins, the Artist Frequency Vercel preview hostname pattern, and any additional exact origins supplied through `CORS_ALLOWED_ORIGINS`. The Edge Functions still authenticate all artist/admin requests with Supabase user JWTs.
+The invoice checkout and Premium sandbox use separate Paystack API credentials. `PAYSTACK_SECRET_KEY` must not be replaced while testing Premium. The CORS allow-list contains the exact production website origins, the Artist Frequency Vercel preview hostname pattern, and any additional exact origins supplied through `CORS_ALLOWED_ORIGINS`. The Edge Functions still authenticate all artist/admin requests with Supabase user JWTs.
 
 ### Sandbox deployment sequence
 
 1. Confirm migrations 0017 and 0018 are applied, then apply migration 0031 after migration 0030.
-2. In Supabase Edge Function Secrets set `PAYSTACK_SECRET_KEY` to the Paystack **Test Mode** secret key. Do not send or commit it. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected by Supabase.
+2. Keep `PAYSTACK_SECRET_KEY` unchanged for the existing invoice-payment flow (normally the live merchant key). Add a separate `PAYSTACK_PREMIUM_TEST_SECRET_KEY` with a Paystack Test Mode `sk_test_` value. Never overwrite the invoice key to test Premium. Add `PAYSTACK_TEST_WEBHOOK_SECRET` with the Test Mode webhook signing secret (`whsec_`). Keep `PAYSTACK_WEBHOOK_SECRET` reserved for the existing live webhook signing secret. Do not send or commit any secret values. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected by Supabase.
 3. Deploy `payment-admin-status`, `create-premium-subscription`, `cancel-premium-subscription`, `create-paystack-checkout`, and `paystack-webhook`. Deploy the webhook without JWT verification (the repository config now sets `verify_jwt = false`).
 4. Sign in as the platform administrator on the preview deployment and select **Check Paystack connection**. Confirm the status says connected, TEST, and Premium plan ready.
 5. Register this webhook URL in the Paystack Test Mode dashboard:
@@ -178,7 +178,7 @@ The recurring Premium membership is a separate Paystack subscription product. It
 
 ### Webhook signature configuration
 
-Paystack's current signing format uses the `Paystack-Signature` header and a webhook signing secret beginning `whsec_`. The webhook function validates HMAC-SHA512 over `timestamp + "." + raw request body`, rejects timestamps outside 300 seconds, and compares the hex signature in constant time. Configure `PAYSTACK_WEBHOOK_SECRET` from Paystack Dashboard → Developers → API configuration. A legacy `x-paystack-signature` check using `PAYSTACK_SECRET_KEY` remains available during migration. Keep the API secret because it is also needed to verify transactions through the Paystack API. Do not store either secret in Git or browser JavaScript.
+Paystack's current signing format uses the `Paystack-Signature` header and a webhook signing secret beginning `whsec_`. The webhook verifies the Test Mode signature with `PAYSTACK_TEST_WEBHOOK_SECRET` and the Live invoice signature with `PAYSTACK_WEBHOOK_SECRET`. It validates HMAC-SHA512 over `timestamp + "." + raw request body`, rejects timestamps outside 300 seconds, and compares the hex signature in constant time. Legacy `x-paystack-signature` verification checks the matching environment API key (`PAYSTACK_PREMIUM_TEST_SECRET_KEY` for Test, `PAYSTACK_SECRET_KEY` for Live). The matched API key is then used to verify the transaction with Paystack. Do not store either secret in Git or browser JavaScript.
 
 ### Recurring membership migration and Edge Functions
 

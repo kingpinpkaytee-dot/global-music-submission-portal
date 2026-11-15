@@ -12,10 +12,16 @@ async function hmacSha512Hex(secret: string, payload: Uint8Array) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
   return hex(await crypto.subtle.sign("HMAC", key, payload));
 }
-async function validPaystackSignature(rawBody: Uint8Array, headers: Headers, webhookSecret: string, apiSecret: string) {
-  // Current Paystack signature: HMAC-SHA512(timestamp + "." + raw body), keyed by whsec_.
+type PaystackCredential = {
+  environment: "test" | "live";
+  apiSecret: string;
+  webhookSecret: string;
+};
+async function identifyPaystackCredential(rawBody: Uint8Array, headers: Headers, credentials: PaystackCredential[]) {
+  // Paystack's current Paystack-Signature is HMAC-SHA512(timestamp + "." + raw body),
+  // signed with the environment-specific whsec_ secret.
   const modernHeader = headers.get("paystack-signature") || "";
-  if (modernHeader && webhookSecret) {
+  if (modernHeader) {
     let timestamp = "";
     const signatures: string[] = [];
     let malformed = false;
@@ -39,16 +45,25 @@ async function validPaystackSignature(rawBody: Uint8Array, headers: Headers, web
       const payload = new Uint8Array(prefix.length + rawBody.length);
       payload.set(prefix, 0);
       payload.set(rawBody, prefix.length);
-      const expected = await hmacSha512Hex(webhookSecret, payload);
-      if (signatures.some(signature => constantTimeHexEqual(expected, signature))) return true;
+      for (const credential of credentials) {
+        if (!credential.webhookSecret) continue;
+        const expected = await hmacSha512Hex(credential.webhookSecret, payload);
+        if (signatures.some(signature => constantTimeHexEqual(expected, signature))) return credential;
+      }
     }
   }
 
-  // Legacy x-paystack-signature: raw-body HMAC using the API secret during migration.
+  // Legacy x-paystack-signature is raw-body HMAC using the API secret key.
+  // Check both environment-specific API secrets during migration.
   const legacyHeader = headers.get("x-paystack-signature") || "";
-  if (!legacyHeader || !apiSecret) return false;
-  const expected = await hmacSha512Hex(apiSecret, rawBody);
-  return constantTimeHexEqual(expected, legacyHeader);
+  if (legacyHeader) {
+    for (const credential of credentials) {
+      if (!credential.apiSecret) continue;
+      const expected = await hmacSha512Hex(credential.apiSecret, rawBody);
+      if (constantTimeHexEqual(expected, legacyHeader)) return credential;
+    }
+  }
+  return null;
 }
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -56,21 +71,33 @@ const providerJson = async (result: Response) => result.json().catch(() => ({}))
 
 Deno.serve(async request => {
   if (request.method !== "POST") return response({ error: "Method not allowed" }, 405);
-  const secret = Deno.env.get("PAYSTACK_SECRET_KEY") || "";
+  const credentials: PaystackCredential[] = [
+    {
+      environment: "test",
+      apiSecret: Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRET_KEY") || "",
+      webhookSecret: Deno.env.get("PAYSTACK_TEST_WEBHOOK_SECRET") || ""
+    },
+    {
+      environment: "live",
+      apiSecret: Deno.env.get("PAYSTACK_SECRET_KEY") || "",
+      webhookSecret: Deno.env.get("PAYSTACK_WEBHOOK_SECRET") || ""
+    }
+  ].filter(credential => Boolean(credential.apiSecret)) as PaystackCredential[];
   const url = Deno.env.get("SUPABASE_URL") || "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  if (!secret || !url || !serviceKey) return response({ error: "Webhook is not configured" }, 503);
+  if (!credentials.length || !url || !serviceKey) return response({ error: "Webhook is not configured" }, 503);
 
   const rawBody = new Uint8Array(await request.arrayBuffer());
-  if (!await validPaystackSignature(rawBody, request.headers, Deno.env.get("PAYSTACK_WEBHOOK_SECRET") || "", secret)) {
-    return response({ error: "Invalid signature" }, 401);
-  }
+  const matchedCredential = await identifyPaystackCredential(rawBody, request.headers, credentials);
+  if (!matchedCredential) return response({ error: "Invalid signature" }, 401);
+  const environment = matchedCredential.environment;
+  const secret = matchedCredential.apiSecret;
   const raw = new TextDecoder().decode(rawBody);
   let event: any;
   try { event = JSON.parse(raw); } catch { return response({ error: "Invalid JSON" }, 400); }
   const data = event?.data || {};
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const providerEventId = `paystack:${String(data.id ?? data.reference ?? data.subscription_code ?? "none")}:${String(event?.event ?? "unknown")}`;
+  const providerEventId = `paystack:${environment}:${String(data.id ?? data.reference ?? data.subscription_code ?? "none")}:${String(event?.event ?? "unknown")}`;
   const { data: inserted, error: insertError } = await admin.from("payment_webhook_events").insert({
     provider: "paystack",
     provider_event_id: providerEventId,
@@ -117,21 +144,21 @@ Deno.serve(async request => {
     if (reference) {
       const byReference = await admin.from("artist_subscriptions")
         .select("id,artist_id,provider_reference,status,provider_subscription_code")
-        .eq("provider_reference", reference).maybeSingle();
+        .eq("provider_reference", reference).eq("provider_environment", environment).maybeSingle();
       if (byReference.error) throw byReference.error;
       if (byReference.data) return byReference.data;
     }
     if (subscriptionCode) {
       const byCode = await admin.from("artist_subscriptions")
         .select("id,artist_id,provider_reference,status,provider_subscription_code")
-        .eq("provider_subscription_code", subscriptionCode).maybeSingle();
+        .eq("provider_subscription_code", subscriptionCode).eq("provider_environment", environment).maybeSingle();
       if (byCode.error) throw byCode.error;
       if (byCode.data) return byCode.data;
     }
     if (customerEmail && planCode) {
       const pending = await admin.from("artist_subscriptions")
         .select("id,artist_id,provider_reference,status,provider_subscription_code")
-        .eq("customer_email", customerEmail).eq("provider_plan_code", planCode)
+        .eq("customer_email", customerEmail).eq("provider_plan_code", planCode).eq("provider_environment", environment)
         .in("status", ["pending_payment","active","non_renewing","attention"])
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (pending.error) throw pending.error;
@@ -187,6 +214,11 @@ Deno.serve(async request => {
   };
 
   try {
+    if (environment !== "test" && ["subscription.create","subscription.not_renew","subscription.disable","invoice.payment_failed","invoice.update"].includes(String(event.event))) {
+      await finish("ignored");
+      return response({ received: true, ignored: true, reason: "Premium subscriptions are sandbox-only." });
+    }
+
     if (event.event === "subscription.create") {
       const target = await findSubscription();
       if (!target) throw new Error("Premium subscription creation did not match a pending Artist Frequency subscription.");
@@ -237,6 +269,10 @@ Deno.serve(async request => {
         return response({ received: true, premium_activated: true });
       }
 
+      if (environment !== "live") {
+        await finish("ignored");
+        return response({ received: true, ignored: true, reason: "Test-mode charge is not an invoice payment." });
+      }
       const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
         headers: { Authorization: `Bearer ${secret}` }
       });
@@ -284,6 +320,10 @@ Deno.serve(async request => {
         }).eq("id", premium.id);
         await finish("processed");
         return response({ received: true, premium_payment_failed: true });
+      }
+      if (environment !== "live") {
+        await finish("ignored");
+        return response({ received: true, ignored: true, reason: "Test-mode charge failure is not an invoice payment." });
       }
       const { data: failedPayment, error: failedError } = await admin.from("payment_transactions")
         .update({ status: "failed" }).eq("provider", "paystack")

@@ -28,14 +28,12 @@ Deno.serve(async request => {
     const url = Deno.env.get("SUPABASE_URL") || "";
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const secret = Deno.env.get("PAYSTACK_SECRET_KEY") || "";
+    const secret = Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRET_KEY") || "";
     if (!url || !anonKey || !serviceKey || !secret) {
       return reply({ error: "Premium checkout is not configured. Ask the administrator to verify Paystack in the Payment Centre." }, 503, origin);
     }
-    const testMode = secret.startsWith("sk_test_");
-    const liveMode = secret.startsWith("sk_live_");
-    if (!testMode && !(liveMode && Deno.env.get("PAYSTACK_ALLOW_LIVE_PREMIUM") === "true")) {
-      return reply({ error: "Premium checkout is locked to Paystack Test Mode until the full sandbox acceptance test passes." }, 423, origin);
+    if (!secret.startsWith("sk_test_")) {
+      return reply({ error: "Premium sandbox key is missing. Configure PAYSTACK_PREMIUM_TEST_SECRET_KEY with the Paystack Test Mode secret. The existing invoice key is not changed." }, 423, origin);
     }
 
     const bearer = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
@@ -45,11 +43,11 @@ Deno.serve(async request => {
     if (authError || !authData.user?.email) return reply({ error: "Your sign-in session is invalid or expired." }, 401, origin);
 
     const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const environment = testMode ? "test" : "live";
+    const environment = "test";
     const { data: account, error: accountError } = await admin.from("payment_provider_accounts")
       .select("capabilities").eq("provider", "paystack").eq("environment", environment).maybeSingle();
     if (accountError) throw accountError;
-    const planCode = String(Deno.env.get("PAYSTACK_PREMIUM_PLAN_CODE") || account?.capabilities?.premium_plan_code || "");
+    const planCode = String(account?.capabilities?.premium_plan_code || "");
     if (!/^PLN_[A-Za-z0-9]+$/.test(planCode)) {
       return reply({ error: "The R99/month Paystack plan has not been provisioned. The administrator must run Check Paystack connection first." }, 503, origin);
     }

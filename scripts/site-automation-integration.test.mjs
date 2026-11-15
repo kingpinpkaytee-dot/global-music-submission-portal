@@ -133,14 +133,18 @@ test("Premium checkout is accessible only through the sandbox-gated server flow"
   assert.ok(html.includes('id="premiumSubscribeButton"'));
   assert.ok(app.includes('invoke("create-premium-subscription"'));
   assert.ok(app.includes('invoke("cancel-premium-subscription"'));
+  assert.ok(createPremiumFunction.includes('Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRET_KEY")'));
   assert.ok(createPremiumFunction.includes('secret.startsWith("sk_test_")'));
-  assert.ok(createPremiumFunction.includes('Deno.env.get("PAYSTACK_ALLOW_LIVE_PREMIUM") === "true"'));
+  assert.ok(!createPremiumFunction.includes("PAYSTACK_ALLOW_LIVE_PREMIUM"));
+  assert.ok(createPremiumFunction.includes('const environment = "test"'));
   assert.ok(!createPremiumFunction.includes("amount: Number("));
   assert.ok(createPremiumFunction.includes("amount: 9900"));
   assert.ok(createPremiumFunction.includes('currency: "ZAR"'));
   assert.ok(createPremiumFunction.includes('interval: "monthly"') || createPremiumFunction.includes("interval: \"monthly\""));
   assert.ok(cancelPremiumFunction.includes("/subscription/disable"));
   assert.ok(cancelPremiumFunction.includes("provider_email_token"));
+  assert.ok(cancelPremiumFunction.includes("PAYSTACK_PREMIUM_TEST_SECRET_KEY"));
+  assert.ok(cancelPremiumFunction.includes('.eq("provider_environment", "test")'));
   assert.ok(!html.includes("Premium activation pending"));
 });
 
@@ -158,6 +162,13 @@ test("Premium subscription database, credits and webhook enforce verified paid m
   assert.ok(paystackWebhookFunction.includes("SHA-512"));
   assert.ok(paystackWebhookFunction.includes("paystack-signature"));
   assert.ok(paystackWebhookFunction.includes("PAYSTACK_WEBHOOK_SECRET"));
+  assert.ok(paystackWebhookFunction.includes("PAYSTACK_TEST_WEBHOOK_SECRET"));
+  assert.ok(paystackWebhookFunction.includes("PAYSTACK_PREMIUM_TEST_SECRET_KEY"));
+  assert.ok(paystackWebhookFunction.includes('environment: "test"'));
+  assert.ok(paystackWebhookFunction.includes('environment: "live"'));
+  assert.ok(paystackWebhookFunction.includes("paystack:${environment}:"));
+  assert.ok(paystackWebhookFunction.includes('.eq("provider_environment", environment)'));
+  assert.ok(paystackWebhookFunction.includes('if (environment !== "live")'));
   assert.ok(paystackWebhookFunction.includes("Math.abs(now - signedAt) <= 300"));
   assert.ok(paystackWebhookFunction.includes("x-paystack-signature"));
   assert.ok(paystackWebhookFunction.includes("transaction/verify/"));
@@ -171,6 +182,10 @@ test("Premium subscription database, credits and webhook enforce verified paid m
 
 test("Paystack admin status checks the credential and provisions the ZAR monthly test plan", () => {
   assert.ok(paymentAdminFunction.includes("api.paystack.co/balance"));
+  assert.ok(paymentAdminFunction.includes('Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRET_KEY")'));
+  assert.ok(paymentAdminFunction.includes('Deno.env.get("PAYSTACK_SECRET_KEY")'));
+  assert.ok(paymentAdminFunction.includes('environment: "test"'));
+  assert.ok(paymentAdminFunction.includes("Do not overwrite PAYSTACK_SECRET_KEY"));
   assert.ok(paymentAdminFunction.includes("api.paystack.co/plan"));
   assert.ok(paymentAdminFunction.includes("amount: 9900"));
   assert.ok(paymentAdminFunction.includes('currency: "ZAR"'));
