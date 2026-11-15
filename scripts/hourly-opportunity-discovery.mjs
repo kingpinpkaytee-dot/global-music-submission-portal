@@ -44,7 +44,7 @@ const platformPlaylistQueries=[
  {category:"playlist",dsp:"Recently updated curator playlists",q:'"Spotify playlist" curator "updated weekly" OR "updated monthly" "submit music" -jobs -dictionary -site:spotify.com'},
  {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist" "submission form" curator electronic music -jobs -dictionary -site:spotify.com'},
  {category:"playlist",dsp:"Independent curator websites",q:'"Spotify playlist curator" "send your music" OR "send us your music" -jobs -dictionary -site:spotify.com' }
-]
+];
 const queries=Array.from({length:Math.max(playlistQueries.length,platformPlaylistQueries.length)},(_,i)=>[playlistQueries[i],platformPlaylistQueries[i]].filter(Boolean)).flat();
 const requestedSearches=Number(process.env.DISCOVERY_SEARCHES_PER_RUN||1);
 const searchesPerRun=Number.isFinite(requestedSearches)?Math.max(1,Math.min(4,requestedSearches)):1;
