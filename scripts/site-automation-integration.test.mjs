@@ -95,13 +95,15 @@ test("automation stages candidates then invokes the guarded publication RPC", ()
   assert.ok(worker.includes("AUTOPUBLISH_DISABLED"));
 });
 
-test("discovery searches broad curator sources and runs bounded independent corroboration", () => {
+test("discovery prioritizes first-party curator sources and runs bounded independent corroboration", () => {
   assert.ok(worker.includes("at least 15 followers"));
   assert.ok(worker.includes('Math.min(4,requestedSearches)'));
+  assert.ok(worker.includes("site:housemusicwithlove.com/spotify-playlists"));
   assert.ok(worker.includes("site:qrtrplaylists.com"));
-  assert.ok(worker.includes("site:indiemono.com"));
-  assert.ok(worker.includes("site:vibeagency.net"));
   assert.ok(worker.includes("site:pitchplaylists.com"));
+  assert.ok(worker.includes("site:dailyplaylists.com/blog"));
+  assert.ok(worker.includes("play.google.com"));
+  assert.ok(worker.includes("crazygames.com"));
   const querySource = worker.slice(worker.indexOf("const playlistQueries="), worker.indexOf("const queries="));
   assert.ok(!querySource.includes('"followers" OR "response rate"'), "metrics must be inspected after discovery, not required in search snippets");
   assert.ok(worker.includes("searchesRemaining:4,searchesUsed:0"));
