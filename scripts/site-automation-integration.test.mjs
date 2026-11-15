@@ -23,7 +23,7 @@ test("embedded website routing scripts parse as JavaScript", () => {
 });
 
 test("internal Artist Frequency navigation always replaces the current tab", () => {
-  const internalRouteAnchors = [...html.matchAll(/<a\\b[^>]*href=["']\\?view=[^"']+["'][^>]*>/gi)].map(match => match[0]);
+  const internalRouteAnchors = [...html.matchAll(/<a\b[^>]*href=["']\?view=[^"']+["'][^>]*>/gi)].map(match => match[0]);
   assert.ok(internalRouteAnchors.length >= 10, "expected dashboard, workspace and navigation route links");
   for (const anchor of internalRouteAnchors) {
     assert.doesNotMatch(anchor, /target=["'](?:_blank|artistFrequencyPopup)["']/i, anchor);
