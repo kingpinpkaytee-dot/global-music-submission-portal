@@ -90,6 +90,19 @@ function attachBackendForm(id, handler) {
   }, true);
 }
 
+function isEligiblePublicPlaylist(item) {
+  if (item?.category !== "playlist") return true;
+  const followers = Number(item.follower_count);
+  const responseRate = Number(item.response_rate);
+  const playlistUrl = String(item.website_url || "").trim();
+  const submissionUrl = String(item.submission_url || "").trim();
+  return item.activity_status === "active" &&
+    Number.isFinite(followers) && followers > 100 &&
+    Number.isFinite(responseRate) && responseRate >= 0.5 && responseRate <= 100 &&
+    /^https:\/\/open[.]spotify[.]com\/playlist\/[A-Za-z0-9]+([/?#].*)?$/i.test(playlistUrl) &&
+    /^https:\/\//i.test(submissionUrl);
+}
+
 function renderOpportunityCards(filter = currentOpportunityFilter) {
   const root = byId("opportunities");
   if (!root) return;
@@ -188,15 +201,26 @@ async function updateOpportunityStats() {
   const baseCount = () => supabase.from("opportunity_directories")
     .select("id", { count: "exact", head: true })
     .eq("is_public", true).eq("is_active", true).eq("is_verified", true);
+  const eligiblePlaylistCount = query => query
+    .gt("follower_count", 100)
+    .gte("response_rate", 0.5)
+    .lte("response_rate", 100)
+    .eq("activity_status", "active");
   const requests = Object.entries(categories).map(async ([id, category]) => {
-    const { count, error } = await baseCount().eq("category", category);
+    let query = baseCount().eq("category", category);
+    if (category === "playlist") query = eligiblePlaylistCount(query);
+    const { count, error } = await query;
     if (error) throw error;
     return [id, count || 0];
   });
   requests.push((async () => {
-    const { count, error } = await baseCount();
-    if (error) throw error;
-    return ["publicOpportunityTotal", count || 0];
+    const [otherResult, playlistResult] = await Promise.all([
+      baseCount().neq("category", "playlist"),
+      eligiblePlaylistCount(baseCount().eq("category", "playlist"))
+    ]);
+    if (otherResult.error) throw otherResult.error;
+    if (playlistResult.error) throw playlistResult.error;
+    return ["publicOpportunityTotal", (otherResult.count || 0) + (playlistResult.count || 0)];
   })());
   const values = await Promise.all(requests);
   values.forEach(([id, value]) => {
@@ -214,7 +238,7 @@ async function loadDirectory() {
     .eq("is_verified", true)
     .order("name", { ascending: true });
   if (error) throw error;
-  directoryRecords = data || [];
+  directoryRecords = (data || []).filter(isEligiblePublicPlaylist);
 
   renderOpportunityCards(currentOpportunityFilter);
   populateSubmissionTargets();

@@ -46,6 +46,43 @@ test("website directory reader displays only active, verified public records", (
   assert.ok(source.includes('.eq("is_active", true)'));
   assert.ok(source.includes('.eq("is_verified", true)'));
   assert.ok(source.includes("follower_count") && source.includes("response_rate"));
+  assert.ok(source.includes("data || []).filter(isEligiblePublicPlaylist"));
+});
+
+test("public playlist listings enforce the required metrics and destination URLs", () => {
+  const start = app.indexOf("function isEligiblePublicPlaylist(item)");
+  const end = app.indexOf("\nfunction renderOpportunityCards", start);
+  assert.ok(start >= 0 && end > start, "public playlist eligibility helper must exist");
+  const context = vm.createContext({});
+  vm.runInContext(app.slice(start, end), context);
+  const eligible = context.isEligiblePublicPlaylist;
+  const valid = {
+    category: "playlist",
+    follower_count: 101,
+    response_rate: 0.5,
+    activity_status: "active",
+    website_url: "https://open.spotify.com/playlist/2OUUjU1AmIw5OoDHk47DAi",
+    submission_url: "https://curator.example/submit"
+  };
+  assert.equal(eligible(valid), true);
+  assert.equal(eligible({ ...valid, follower_count: 100 }), false);
+  assert.equal(eligible({ ...valid, response_rate: 0 }), false);
+  assert.equal(eligible({ ...valid, response_rate: 100.1 }), false);
+  assert.equal(eligible({ ...valid, activity_status: "unknown" }), false);
+  assert.equal(eligible({ ...valid, website_url: "https://open.spotify.com/" }), false);
+  assert.equal(eligible({ ...valid, submission_url: "http://curator.example/submit" }), false);
+  assert.equal(eligible({ ...valid, category: "radio_station" }), true);
+});
+
+test("playlist statistics enforce the same follower, response and activity thresholds", () => {
+  const start = app.indexOf("async function updateOpportunityStats()");
+  const end = app.indexOf("async function loadDirectory()", start);
+  assert.ok(start >= 0 && end > start, "opportunity statistics function must exist");
+  const source = app.slice(start, end);
+  assert.ok(source.includes('.gt("follower_count", 100)'));
+  assert.ok(source.includes('.gte("response_rate", 0.5)'));
+  assert.ok(source.includes('.lte("response_rate", 100)'));
+  assert.ok(source.includes('.eq("activity_status", "active")'));
 });
 
 test("automation stages candidates then invokes the guarded publication RPC", () => {
