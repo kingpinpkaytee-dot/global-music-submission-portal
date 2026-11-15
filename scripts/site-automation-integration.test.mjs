@@ -14,6 +14,12 @@ const worker = read("./hourly-opportunity-discovery.mjs");
 const migration28 = read("../supabase/migrations/0028_autonomous_verified_opportunity_publication.sql");
 const migration29 = read("../supabase/migrations/0029_harden_autonomous_playlist_publication.sql");
 const migration30 = read("../supabase/migrations/0030_playlist_minimum_followers_15.sql");
+const premiumMigration31 = read("../supabase/migrations/0031_artist_premium_subscriptions.sql");
+const createPremiumFunction = read("../supabase/functions/create-premium-subscription/index.ts");
+const cancelPremiumFunction = read("../supabase/functions/cancel-premium-subscription/index.ts");
+const paymentAdminFunction = read("../supabase/functions/payment-admin-status/index.ts");
+const paystackWebhookFunction = read("../supabase/functions/paystack-webhook/index.ts");
+const supabaseConfig = read("../supabase/config.toml");
 const workflow = read("../.github/workflows/hourly-opportunity-discovery.yml");
 
 test("embedded website routing scripts parse as JavaScript", () => {
@@ -117,13 +123,54 @@ test("Premium pricing routes from public navigation and dashboard", () => {
   assert.ok(html.includes('premium: "premium-access"'));
   assert.ok(html.includes('href="?view=premium"'));
   assert.ok(html.includes("R99"));
-  assert.ok(html.includes("Premium activation pending"));
+  assert.ok(html.includes('id="premiumSubscribeButton"'));
+  assert.ok(html.includes('id="premiumMembershipStatus"'));
+  assert.ok(html.includes("R99"));
   assert.ok(html.includes("PRE-LAUNCH STATUS"));
 });
 
-test("Premium checkout is not exposed as an enabled purchase before billing launch", () => {
-  assert.match(html, /<button[^>]*disabled[^>]*>Premium activation pending<\/button>/);
-  assert.match(html, /recurring billing[^<]*must pass production tests/i);
+test("Premium checkout is accessible only through the sandbox-gated server flow", () => {
+  assert.ok(html.includes('id="premiumSubscribeButton"'));
+  assert.ok(app.includes('invoke("create-premium-subscription"'));
+  assert.ok(app.includes('invoke("cancel-premium-subscription"'));
+  assert.ok(createPremiumFunction.includes('secret.startsWith("sk_test_")'));
+  assert.ok(createPremiumFunction.includes('Deno.env.get("PAYSTACK_ALLOW_LIVE_PREMIUM") === "true"'));
+  assert.ok(!createPremiumFunction.includes("amount: Number("));
+  assert.ok(createPremiumFunction.includes("amount: 9900"));
+  assert.ok(createPremiumFunction.includes('currency: "ZAR"'));
+  assert.ok(createPremiumFunction.includes('interval: "monthly"') || createPremiumFunction.includes("interval: \"monthly\""));
+  assert.ok(cancelPremiumFunction.includes("/subscription/disable"));
+  assert.ok(cancelPremiumFunction.includes("provider_email_token"));
+  assert.ok(!html.includes("Premium activation pending"));
+});
+
+test("Premium subscription database and webhook enforce verified paid membership", () => {
+  assert.ok(premiumMigration31.includes("CREATE TABLE IF NOT EXISTS public.artist_subscriptions"));
+  assert.ok(premiumMigration31.includes("provider_email_token"));
+  assert.ok(premiumMigration31.includes("GRANT SELECT ("));
+  assert.ok(premiumMigration31.includes("settle_artist_premium_subscription_payment"));
+  assert.ok(premiumMigration31.includes("TO service_role"));
+  assert.ok(paystackWebhookFunction.includes("HMAC"));
+  assert.ok(paystackWebhookFunction.includes("SHA-512"));
+  assert.ok(paystackWebhookFunction.includes("x-paystack-signature"));
+  assert.ok(paystackWebhookFunction.includes("transaction/verify/"));
+  assert.ok(paystackWebhookFunction.includes("Number(verified.amount) !== 9900"));
+  assert.ok(paystackWebhookFunction.includes('event.event === "invoice.update"'));
+  assert.ok(paystackWebhookFunction.includes('event.event === "subscription.not_renew"'));
+  assert.ok(paystackWebhookFunction.includes('event.event === "subscription.disable"'));
+  assert.ok(supabaseConfig.includes("[functions.paystack-webhook]"));
+  assert.ok(supabaseConfig.includes("verify_jwt = false"));
+});
+
+test("Paystack admin status checks the credential and provisions the ZAR monthly test plan", () => {
+  assert.ok(paymentAdminFunction.includes("api.paystack.co/balance"));
+  assert.ok(paymentAdminFunction.includes("api.paystack.co/plan"));
+  assert.ok(paymentAdminFunction.includes("amount: 9900"));
+  assert.ok(paymentAdminFunction.includes('currency: "ZAR"'));
+  assert.ok(paymentAdminFunction.includes('interval: "monthly"'));
+  assert.ok(paymentAdminFunction.includes("CORS_ALLOWED_ORIGINS"));
+  assert.ok(paymentAdminFunction.includes("artist-frequency-preview-"));
+  assert.ok(paymentAdminFunction.includes("globalmusicsubmissionportal.org"));
 });
 
 test("website directory reader displays only active, verified public records", () => {

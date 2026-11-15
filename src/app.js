@@ -860,6 +860,117 @@ async function startInvoiceCheckout(invoiceId, button) {
   }
 }
 
+async function loadPremiumSubscription() {
+  const statusNode = byId("premiumMembershipStatus");
+  const messageNode = byId("premiumMembershipMessage");
+  const subscribeButton = byId("premiumSubscribeButton");
+  const cancelButton = byId("premiumCancelButton");
+  if (!statusNode || !supabase) return;
+  if (!currentUser) {
+    statusNode.textContent = "Sign in to check your membership";
+    if (messageNode) messageNode.textContent = "Sign in before starting or managing a Premium subscription.";
+    if (subscribeButton) { subscribeButton.disabled = false; subscribeButton.textContent = "Subscribe · R99/month"; }
+    if (cancelButton) cancelButton.hidden = true;
+    return;
+  }
+  statusNode.textContent = "Checking…";
+  if (messageNode) messageNode.textContent = "Loading your verified membership status.";
+  try {
+    const { data, error } = await supabase.from("artist_subscriptions")
+      .select("id,status,tier,amount_minor,currency,next_payment_date,paid_through_at,cancel_at_period_end,created_at")
+      .eq("artist_id", currentUser.id)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      statusNode.textContent = "Free · no active Premium membership";
+      if (messageNode) messageNode.textContent = "You can start a R99/month Premium subscription using Paystack Test Mode while sandbox testing is open.";
+      if (subscribeButton) { subscribeButton.disabled = false; subscribeButton.textContent = "Subscribe · R99/month"; }
+      if (cancelButton) cancelButton.hidden = true;
+    } else {
+      const status = String(data.status || "unknown").toLowerCase();
+      const paidThrough = data.paid_through_at ? new Date(data.paid_through_at) : null;
+      const entitledStatus = ["active", "non_renewing", "attention"].includes(status);
+      const entitled = entitledStatus && (!paidThrough || paidThrough.getTime() > Date.now());
+      const dateLabel = value => value ? new Date(value).toLocaleDateString("en-ZA") : "not yet confirmed";
+      if (status === "pending_payment") {
+        statusNode.textContent = "Pending Paystack payment";
+        if (messageNode) messageNode.textContent = "Complete the hosted Paystack checkout. Premium access is not active until the verified payment webhook arrives.";
+      } else if (entitled && status === "non_renewing") {
+        statusNode.textContent = "Premium · renewal cancelled";
+        if (messageNode) messageNode.textContent = "Premium remains active until " + dateLabel(data.paid_through_at || data.next_payment_date) + ". No further renewal is scheduled.";
+      } else if (entitled && status === "attention") {
+        statusNode.textContent = "Premium · payment needs attention";
+        if (messageNode) messageNode.textContent = "Your last renewal needs attention. Current paid access is retained until " + dateLabel(data.paid_through_at) + ". Check your Paystack subscription card details.";
+      } else if (entitled) {
+        statusNode.textContent = "Premium active";
+        if (messageNode) messageNode.textContent = "R99 ZAR per month · next payment date " + dateLabel(data.next_payment_date) + ".";
+      } else if (status === "failed") {
+        statusNode.textContent = "Checkout unsuccessful";
+        if (messageNode) messageNode.textContent = "No active Premium membership was created. You may safely retry checkout.";
+      } else {
+        statusNode.textContent = "Free · Premium inactive";
+        if (messageNode) messageNode.textContent = "The previous membership is no longer active. You can start a new subscription.";
+      }
+      if (subscribeButton) {
+        subscribeButton.disabled = status === "pending_payment" || entitled;
+        subscribeButton.textContent = entitled ? "Premium membership active" : status === "pending_payment" ? "Payment pending…" : "Subscribe · R99/month";
+      }
+      if (cancelButton) cancelButton.hidden = !["active", "attention"].includes(status) || !entitled;
+    }
+    const paymentReturn = new URLSearchParams(window.location.search).get("payment");
+    if (paymentReturn === "return" && messageNode && !data) {
+      messageNode.textContent = "You returned from Paystack. The site does not activate Premium from the browser redirect; it waits for the signed and verified payment webhook.";
+    }
+  } catch (error) {
+    statusNode.textContent = "Membership status unavailable";
+    if (messageNode) messageNode.textContent = error.message || "The Premium membership table is not ready yet. The administrator must apply migration 0031.";
+    if (subscribeButton) subscribeButton.disabled = true;
+    if (cancelButton) cancelButton.hidden = true;
+  }
+}
+
+async function startPremiumSubscription(button) {
+  if (!currentUser) {
+    sessionStorage.setItem("artistFrequencyAuthReturn", "premium");
+    window.location.assign(window.location.origin + "/?view=account&authRequired=premium");
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = "Preparing secure checkout…"; }
+  try {
+    const { data, error } = await supabase.functions.invoke("create-premium-subscription", { body: {} });
+    if (error) throw new Error(data?.error || error.message || "Premium checkout could not be started.");
+    const checkout = safeHttpUrl(data?.checkout_url);
+    if (!checkout || new URL(checkout).hostname !== "checkout.paystack.com") {
+      throw new Error(data?.error || "Paystack did not return a recognised hosted checkout URL.");
+    }
+    window.location.assign(checkout);
+  } catch (error) {
+    setMessage("premiumMembershipMessage", error.message || "Premium checkout could not be started.", true);
+    if (button) { button.disabled = false; button.textContent = "Subscribe · R99/month"; }
+    await loadPremiumSubscription();
+  }
+}
+
+async function cancelPremiumSubscription(button) {
+  if (!currentUser) {
+    window.location.assign(window.location.origin + "/?view=account&authRequired=premium");
+    return;
+  }
+  if (!window.confirm("Cancel your Premium subscription renewal? Your current paid access will remain until the end of the billing period.")) return;
+  if (button) { button.disabled = true; button.textContent = "Cancelling renewal…"; }
+  try {
+    const { data, error } = await supabase.functions.invoke("cancel-premium-subscription", { body: {} });
+    if (error) throw new Error(data?.error || error.message || "Premium renewal could not be cancelled.");
+    if (byId("premiumMembershipMessage")) byId("premiumMembershipMessage").textContent =
+      data?.message || "Renewal cancelled. Premium remains active for the paid period.";
+    await loadPremiumSubscription();
+  } catch (error) {
+    setMessage("premiumMembershipMessage", error.message || "Premium renewal could not be cancelled.", true);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = "Cancel renewal"; }
+  }
+}
+
 async function refreshAdminPaymentStatus() {
   if (currentRole !== "admin" || !supabase) return;
   const status = byId("paymentProviderStatus");
@@ -937,7 +1048,7 @@ async function loadArtistWorkspace() {
   try {
     const profile = await loadArtistProfile();
     if (!profile) throw new Error("Your artist profile has not been created yet. Please refresh after confirming your email.");
-    await Promise.all([loadArtistSubmissions(), loadCreditBalance(), loadMarketplaceShares(), loadCampaigns(), loadArtistInvoices()]);
+    await Promise.all([loadArtistSubmissions(), loadCreditBalance(), loadMarketplaceShares(), loadCampaigns(), loadArtistInvoices(), loadPremiumSubscription()]);
     if (currentRole === "admin") {
       const adminLoads = await Promise.allSettled([
         loadAdminMarketplaceQueue(), loadAdminDirectory(), loadAdminCandidates(), refreshAdminPaymentStatus(),
@@ -961,6 +1072,10 @@ async function updateSessionUser(user) {
     if (byId("adminArea")) byId("adminArea").hidden = true;
     if (byId("adminDashboardTile")) byId("adminDashboardTile").hidden = true;
     if (byId("artistInvoices")) { byId("artistInvoices").className = "empty"; byId("artistInvoices").textContent = "Sign in to view your invoices."; }
+    if (byId("premiumMembershipStatus")) byId("premiumMembershipStatus").textContent = "Sign in to check your membership";
+    if (byId("premiumMembershipMessage")) byId("premiumMembershipMessage").textContent = "Sign in before starting or managing a Premium subscription.";
+    if (byId("premiumSubscribeButton")) { byId("premiumSubscribeButton").disabled = false; byId("premiumSubscribeButton").textContent = "Subscribe · R99/month"; }
+    if (byId("premiumCancelButton")) byId("premiumCancelButton").hidden = true;
     if (byId("trackList")) {
       byId("trackList").className = "empty";
       byId("trackList").textContent = "Sign in to view your submissions.";
@@ -984,6 +1099,11 @@ async function updateSessionUser(user) {
   if (!wasSameUser) await loadArtistWorkspace();
   const authReturn = sessionStorage.getItem("artistFrequencyAuthReturn");
   const authRequired = new URLSearchParams(window.location.search).get("authRequired");
+  if (authReturn === "premium" || authRequired === "premium") {
+    sessionStorage.removeItem("artistFrequencyAuthReturn");
+    window.location.assign(window.location.origin + "/?view=premium");
+    return;
+  }
   if (authReturn === "submissions" || authRequired === "submission") {
     sessionStorage.removeItem("artistFrequencyAuthReturn");
     sessionStorage.setItem("artistFrequencyPostAuthNotice", "You are signed in. Your music was not submitted automatically; review the form and submit it when ready.");
@@ -996,6 +1116,8 @@ document.getElementById("filters")?.addEventListener("click", event => {
   if (button) renderOpportunityCards(button.dataset.filter);
 });
 byId("submissionType")?.addEventListener("change", populateSubmissionTargets);
+byId("premiumSubscribeButton")?.addEventListener("click", event => startPremiumSubscription(event.currentTarget));
+byId("premiumCancelButton")?.addEventListener("click", event => cancelPremiumSubscription(event.currentTarget));
 
 byId("publishAllCandidates")?.addEventListener("click", async event => {
   const button = event.currentTarget;

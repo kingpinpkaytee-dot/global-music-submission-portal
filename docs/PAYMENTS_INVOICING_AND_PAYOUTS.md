@@ -111,3 +111,52 @@ No invoice can be paid through the platform and no paid credit package can be fu
 - Invoice prices are manually entered by the administrator. The previously proposed service tariff is not activated or assumed approved.
 - Tax is zero by default. VAT must not be charged or described as applicable unless the business's VAT registration and tax obligations have been confirmed.
 - These functions and UI are source code only until migrations, secrets, function deployments, webhook registration and end-to-end sandbox testing are completed.
+
+
+## Recurring Premium membership — sandbox implementation
+
+The recurring Premium membership is implemented as a separate Paystack subscription product; it does not reuse the one-time invoice-payment flow.
+
+- Product: Artist Frequency Premium, **ZAR 99.00 monthly** (9,900 cents).
+- Payment method: Paystack recurring bank-card authorization. Bank EFT / Capitec Pay are one-off methods and are not used for recurring membership.
+- Paystack plan: the administrator's Payment Centre checks the merchant key and provisions/reuses the matching monthly ZAR 9,900 plan in **Test Mode**. The resulting plan code is stored in the non-secret `payment_provider_accounts.capabilities` metadata.
+- Artist flow: authenticated user → server creates a pending subscription row → server initializes Paystack transaction with the plan code → browser is redirected to Paystack-hosted checkout.
+- Entitlement: browser return URL never activates Premium. The webhook validates Paystack HMAC-SHA512, verifies the transaction directly with Paystack, confirms ZAR 9,900, and calls the service-role-only settlement RPC before the membership is marked active.
+- Management: the artist can request cancellation using the stored Paystack subscription code and private email token. The token remains server-only. Cancellation stops future renewal but preserves access through the paid period.
+- Renewal events: process `invoice.update`, `invoice.payment_failed`, `subscription.not_renew`, `subscription.disable`, and `charge.success`. Duplicate webhook events are idempotently recorded in `payment_webhook_events`.
+- Payment failure: the membership moves to `attention`; it is not renewed or granted extra paid time unless Paystack later verifies a successful renewal. Access already paid for remains available until `paid_through_at`.
+- Environment guard: `create-premium-subscription` only accepts `sk_test_` by default. A live key is rejected unless the separate `PAYSTACK_ALLOW_LIVE_PREMIUM=true` flag is intentionally provisioned after formal launch approval. Do not add that flag during sandbox testing.
+
+### Recurring membership migration and Edge Functions
+
+Migration `0031_artist_premium_subscriptions.sql` creates the subscription ledger, restricts browser access to non-sensitive membership columns, and exposes a settlement RPC only to `service_role`.
+
+Additional functions:
+
+- `create-premium-subscription` — authenticated artist, fixed plan/amount, no browser-supplied amount or plan code.
+- `cancel-premium-subscription` — authenticated owner only; Paystack email token is never returned.
+- `payment-admin-status` — validates the Paystack credential and prepares/reuses the Test Mode R99 ZAR monthly plan.
+- `paystack-webhook` — HMAC-SHA512 provider callback; configured with `verify_jwt=false` because Paystack signs its callbacks using `x-paystack-signature`, not a Supabase user JWT.
+
+The CORS allow-list contains the exact production website origins, the Artist Frequency Vercel preview hostname pattern, and any additional exact origins supplied through `CORS_ALLOWED_ORIGINS`. The Edge Functions still authenticate all artist/admin requests with Supabase user JWTs.
+
+### Sandbox deployment sequence
+
+1. Confirm migrations 0017 and 0018 are applied, then apply migration 0031 after migration 0030.
+2. In Supabase Edge Function Secrets set `PAYSTACK_SECRET_KEY` to the Paystack **Test Mode** secret key. Do not send or commit it. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected by Supabase.
+3. Deploy `payment-admin-status`, `create-premium-subscription`, `cancel-premium-subscription`, `create-paystack-checkout`, and `paystack-webhook`. Deploy the webhook without JWT verification (the repository config now sets `verify_jwt = false`).
+4. Sign in as the platform administrator on the preview deployment and select **Check Paystack connection**. Confirm the status says connected, TEST, and Premium plan ready.
+5. Register this webhook URL in the Paystack Test Mode dashboard:
+   `https://mdcvewnevgsgmyfnybgn.supabase.co/functions/v1/paystack-webhook`
+6. Run a successful test-card checkout, then confirm the subscription row becomes active only after a verified webhook. Also test failed charge, duplicate webhook, cancellation, renewal success and renewal failure.
+7. Keep production checkout locked. Do not use a live key or set `PAYSTACK_ALLOW_LIVE_PREMIUM=true` until all sandbox cases and merchant setup have passed.
+
+### Test acceptance criteria
+
+- An unsigned browser cannot create, view or cancel another artist's membership.
+- An artist can read only non-sensitive status columns for their own subscription.
+- The server ignores client-supplied plan/amount and always uses the stored R99 ZAR monthly plan.
+- A return URL alone never activates access.
+- Invalid signatures, unknown references, wrong amounts, wrong currency and duplicate events never create or extend a membership.
+- Cancellation preserves paid access to the recorded end date and prevents renewal.
+- Live card billing remains disabled during the preview testing phase.
