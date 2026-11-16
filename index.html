@@ -175,33 +175,46 @@
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view");
   const routes = {
-    dashboard: "dashboard-home",
-    submissions: "submit",
-    billing: "billing",
-    discover: "discover",
-    marketplace: "marketplace",
-    campaigns: "campaigns",
-    profile: "artist-account",
-    account: "sign-in",
-    stats: "public-stats",
-    admin: "adminArea",
-    premium: "premium-access"
+    dashboard: "dashboard-home", submissions: "submit", billing: "billing",
+    discover: "discover", marketplace: "marketplace", campaigns: "campaigns",
+    profile: "artist-account", account: "sign-in", stats: "public-stats",
+    admin: "adminArea", premium: "premium-access"
   };
-  if (!view || !routes[view]) return;
-  const targetId = routes[view];
-  document.body.dataset.dashboardWindow = "true";
-  document.querySelectorAll("main > section").forEach(section => {
-    section.hidden = section.id !== targetId;
-  });
-  const target = document.getElementById(targetId);
-  if (target && targetId !== "adminArea") target.hidden = false;
-  if (targetId === "adminArea" && target) target.hidden = true;
-  const brand = document.getElementById("brandLink");
-  if (brand) brand.href = "?view=dashboard";
-  const navActions = document.querySelector(".nav-actions");
-  if (navActions) navActions.innerHTML =
-    '<a class="btn ghost" href="?view=dashboard">Dashboard</a>' +
-    '<a class="btn primary" href="?view=submissions">Submissions</a>';
+  if (view && routes[view]) {
+    document.body.dataset.dashboardWindow = "true";
+    document.querySelectorAll("main > section").forEach(section => {
+      section.hidden = section.id !== routes[view];
+    });
+    const target = document.getElementById(routes[view]);
+    if (target && view !== "admin") target.hidden = false;
+    // The administrator view stays gated until app.js confirms the signed-in
+    // user's database role. Signed-out visitors are shown the sign-in page.
+    if (view === "admin") {
+      const signIn = document.getElementById("sign-in");
+      if (signIn) signIn.hidden = false;
+    }
+    const brand = document.getElementById("brandLink");
+    if (brand) brand.href = "?view=dashboard";
+    const navActions = document.querySelector(".nav-actions");
+    if (navActions) navActions.innerHTML =
+      '<a class="btn ghost" href="?view=dashboard">Dashboard</a>' +
+      '<a class="btn primary" href="?view=submissions">Submissions</a>';
+  }
+
+  // Capture internal navigation before any module script executes. This also
+  // neutralises accidental target=_blank values on first-party links.
+  document.addEventListener("click", event => {
+    const anchor = event.target.closest && event.target.closest("a[href]");
+    if (!anchor || event.defaultPrevented || event.button !== 0 ||
+        event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const raw = anchor.getAttribute("href") || "";
+    if (!raw || raw.startsWith("#") || raw.startsWith("mailto:") || raw.startsWith("tel:")) return;
+    let destination;
+    try { destination = new URL(raw, window.location.href); } catch { return; }
+    if (destination.origin !== window.location.origin || !["http:", "https:"].includes(destination.protocol)) return;
+    event.preventDefault();
+    window.location.assign(destination.href);
+  }, true);
 })();
 document.getElementById("year").textContent = new Date().getFullYear();
 </script>
