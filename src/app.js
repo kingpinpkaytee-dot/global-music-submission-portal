@@ -2,11 +2,12 @@ import { supabase, isSupabaseConfigured } from "./supabase-client.js";
 
 window.artistFrequencyBackendActive = true;
 
-// Internal Artist Frequency navigation must always replace the current tab.
-// Only genuine off-site links marked for a new window use the reusable external popup.
+// Keep every internal Artist Frequency route in the current browser tab.
+// This applies even if a link accidentally carries target="_blank" or a popup target.
 document.addEventListener("click", event => {
   const anchor = event.target.closest("a[href]");
   if (!anchor) return;
+
   const raw = anchor.getAttribute("href") || "";
   if (!raw || raw.startsWith("#") || raw.startsWith("mailto:") || raw.startsWith("tel:")) return;
 
@@ -14,18 +15,19 @@ document.addEventListener("click", event => {
   try { destination = new URL(raw, window.location.href); } catch { return; }
   if (!["http:", "https:"].includes(destination.protocol)) return;
 
-  const requestsSeparateWindow = anchor.target === "_blank" || anchor.target === "artistFrequencyPopup";
   const isInternalRoute = destination.origin === window.location.origin;
-
   if (isInternalRoute) {
-    if (requestsSeparateWindow) {
-      event.preventDefault();
-      window.location.assign(destination.href);
-    }
+    // Preserve native browser behaviour for modified clicks (new tab requested by user).
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    window.location.assign(destination.href);
     return;
   }
 
+  // Off-site resources may open in a separate window only when explicitly marked.
+  const requestsSeparateWindow = anchor.target === "_blank" || anchor.target === "artistFrequencyPopup";
   if (!requestsSeparateWindow) return;
+
   event.preventDefault();
   const popup = window.open(destination.href, "ArtistFrequencyExternal", "popup=yes,width=1180,height=850,resizable=yes,scrollbars=yes");
   if (popup) {
