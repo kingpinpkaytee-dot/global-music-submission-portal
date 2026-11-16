@@ -1002,8 +1002,9 @@ async function updateSessionUser(user) {
   }
   if (!wasSameUser) await loadArtistWorkspace();
   applyRequestedView();
-  const postAuthRoute = sessionStorage.getItem("artistFrequencyPostAuthRoute");
+  const postAuthRoute = localStorage.getItem("artistFrequencyPostAuthRoute") || sessionStorage.getItem("artistFrequencyPostAuthRoute");
   if (postAuthRoute) {
+    localStorage.removeItem("artistFrequencyPostAuthRoute");
     sessionStorage.removeItem("artistFrequencyPostAuthRoute");
     if (postAuthRoute !== window.location.pathname + window.location.search) {
       window.location.assign(postAuthRoute);
