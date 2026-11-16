@@ -13,6 +13,24 @@ function showAuthMessage(text, isError = false) {
   authResult.style.borderColor = isError ? "#8c4545" : "";
 }
 
+function postAuthRoute() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("authRequired") === "submission") return "/?view=submissions";
+  const view = params.get("view");
+  if (view && view !== "account") return "/?view=" + encodeURIComponent(view);
+  return "/?view=dashboard";
+}
+
+function prepareAuthReturn() {
+  const route = postAuthRoute();
+  try { sessionStorage.setItem("artistFrequencyPostAuthRoute", route); } catch {}
+  return route;
+}
+
+function callbackUrl() {
+  return window.location.origin + "/?view=account&authCallback=1";
+}
+
 function publishSession(session) {
   const email = session?.user?.email || "";
   if (signedInAs) signedInAs.textContent = email ? `Signed in as ${email}` : "Not signed in";
@@ -54,20 +72,21 @@ if (!isSupabaseConfigured || !supabase) {
       return;
     }
     if (button) button.disabled = true;
+    prepareAuthReturn();
     showAuthMessage("Creating your secure artist account…");
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: callbackUrl(),
           data: { artist_name: artistName }
         }
       });
       if (error) throw error;
       showAuthMessage(data.session
         ? "Account created and signed in. Your artist workspace is loading."
-        : "Registration received. Check your email to confirm your account, then sign in.");
+        : "Registration received. Check your email to confirm your account. The confirmation link will return you to Artist Frequency.");
     } catch (error) {
       showAuthMessage(error.message || "Registration failed. Please try again.", true);
     } finally {
@@ -84,11 +103,12 @@ if (!isSupabaseConfigured || !supabase) {
     }
     const button = document.getElementById("emailSignIn");
     if (button) button.disabled = true;
+    prepareAuthReturn();
     showAuthMessage("Signing in securely…");
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      showAuthMessage("Signed in. Your artist workspace is loading.");
+      showAuthMessage("Signed in. Returning you to your Artist Frequency workspace…");
     } catch (error) {
       showAuthMessage(error.message || "Sign-in failed. Check your details and try again.", true);
     } finally {
@@ -98,10 +118,11 @@ if (!isSupabaseConfigured || !supabase) {
 
   document.getElementById("googleSignIn")?.addEventListener("click", async () => {
     if (googleNotice) googleNotice.textContent = "Connecting to Google…";
+    prepareAuthReturn();
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin + window.location.pathname + window.location.search }
+        options: { redirectTo: callbackUrl() }
       });
       if (error) throw error;
     } catch (error) {
@@ -111,11 +132,12 @@ if (!isSupabaseConfigured || !supabase) {
 
   document.getElementById("spotifySignIn")?.addEventListener("click", async () => {
     if (spotifyNotice) spotifyNotice.textContent = "Connecting to Spotify…";
+    prepareAuthReturn();
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "spotify",
         options: {
-          redirectTo: window.location.origin + window.location.pathname + window.location.search,
+          redirectTo: callbackUrl(),
           scopes: "user-read-email"
         }
       });
@@ -139,9 +161,9 @@ if (!isSupabaseConfigured || !supabase) {
   });
 
   if (googleNotice) {
-    googleNotice.textContent = "Google sign-in requires the Google provider and redirect URL to be enabled in Supabase Auth settings.";
+    googleNotice.textContent = "Google sign-in returns to Artist Frequency after authorisation.";
   }
   if (spotifyNotice) {
-    spotifyNotice.textContent = "Spotify sign-in requires the Spotify provider and callback URL to be enabled in Supabase Auth settings.";
+    spotifyNotice.textContent = "Spotify sign-in returns to Artist Frequency after authorisation; your Spotify identity remains the selected sign-in provider.";
   }
 }
