@@ -40,7 +40,7 @@ The single-page frontend now uses the shared Supabase JS v2 client in `src/supab
 
 ## Dashboard navigation
 
-The Dashboard is a workspace launcher rather than one continuous spreadsheet-style page. Each selection opens a dedicated browser tab using its own `?view=` route: submissions and credits, opportunity discovery, Marketplace, campaign planner, artist profile, account/sign-in, community statistics and the admin workspace. Each focused view includes a return-to-Dashboard link. The administrator selection is shown only after the signed-in profile confirms the admin role; database policies and RPC checks remain the authority for protected actions.
+The Dashboard is a workspace launcher rather than one continuous spreadsheet-style page. Every internal selection uses its own `?view=` route (submissions and credits, opportunity discovery, Marketplace, campaign planner, artist profile, account/sign-in, community statistics, billing and admin workspace) but navigates in the **same active browser tab**. Internal links are forced to replace the current page even if an accidental `_blank` target is added. External resource links may open separately when explicitly marked. Each focused view includes a return-to-Dashboard link. The administrator selection is shown only after the signed-in profile confirms the admin role; database policies and RPC checks remain the authority for protected actions.
 
 Connected frontend flows include:
 - Email/password sign-up and sign-in through Supabase Auth, session persistence and sign-out.
