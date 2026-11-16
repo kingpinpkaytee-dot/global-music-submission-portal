@@ -23,7 +23,10 @@ function postAuthRoute() {
 
 function prepareAuthReturn() {
   const route = postAuthRoute();
-  try { sessionStorage.setItem("artistFrequencyPostAuthRoute", route); } catch {}
+  try {
+    localStorage.setItem("artistFrequencyPostAuthRoute", route);
+    sessionStorage.setItem("artistFrequencyPostAuthRoute", route);
+  } catch {}
   return route;
 }
 
