@@ -17,9 +17,15 @@ const migration30 = read("../supabase/migrations/0030_playlist_minimum_followers
 const workflow = read("../.github/workflows/hourly-opportunity-discovery.yml");
 
 test("embedded website routing scripts parse as JavaScript", () => {
-  const scripts = [...html.matchAll(/<script\b(?![^>]*\btype=["']module["'])[^>]*>([\s\S]*?)<\/script>/gi)];
-  assert.ok(scripts.length >= 1, "expected at least one inline script");
-  for (const [, source] of scripts) new vm.Script(source, { filename: "index.html:inline-script" });
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(([, attributes]) => {
+      if (/\bsrc\s*=/i.test(attributes)) return false;
+      const type = attributes.match(/\btype\s*=\s*["']?([^\s"'>]+)/i)?.[1]?.toLowerCase();
+      return !type || type === "text/javascript" || type === "application/javascript" ||
+        type === "text/ecmascript" || type === "application/ecmascript";
+    });
+  assert.ok(scripts.length >= 1, "expected at least one executable inline script");
+  for (const [, , source] of scripts) new vm.Script(source, { filename: "index.html:inline-script" });
 });
 
 test("internal Artist Frequency navigation always replaces the current tab", () => {
