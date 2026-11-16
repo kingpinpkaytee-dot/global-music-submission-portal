@@ -44,6 +44,22 @@ let directoryRecords = [];
 let adminDirectoryRecords = [];
 let currentOpportunityFilter = "all";
 
+function applyRequestedView() {
+  const view = new URLSearchParams(window.location.search).get("view");
+  if (view !== "admin") return;
+  const adminArea = byId("adminArea");
+  const signIn = byId("sign-in");
+  document.body.dataset.dashboardWindow = "true";
+  document.querySelectorAll("main > section").forEach(section => {
+    section.hidden = section.id !== (currentUser && currentRole === "admin" ? "adminArea" : "sign-in");
+  });
+  if (adminArea) adminArea.hidden = !(currentUser && currentRole === "admin");
+  if (signIn && (!currentUser || currentRole !== "admin")) signIn.hidden = false;
+  if (currentUser && currentRole !== "admin") {
+    setMessage("authResult", "This account is signed in, but it does not have database-confirmed administrator privileges.", true);
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -981,9 +997,19 @@ async function updateSessionUser(user) {
       byId("campaignList").className = "empty";
       byId("campaignList").textContent = "Sign in to view your campaign requests.";
     }
+    applyRequestedView();
     return;
   }
   if (!wasSameUser) await loadArtistWorkspace();
+  applyRequestedView();
+  const postAuthRoute = sessionStorage.getItem("artistFrequencyPostAuthRoute");
+  if (postAuthRoute) {
+    sessionStorage.removeItem("artistFrequencyPostAuthRoute");
+    if (postAuthRoute !== window.location.pathname + window.location.search) {
+      window.location.assign(postAuthRoute);
+      return;
+    }
+  }
   const authReturn = sessionStorage.getItem("artistFrequencyAuthReturn");
   const authRequired = new URLSearchParams(window.location.search).get("authRequired");
   if (authReturn === "submissions" || authRequired === "submission") {
