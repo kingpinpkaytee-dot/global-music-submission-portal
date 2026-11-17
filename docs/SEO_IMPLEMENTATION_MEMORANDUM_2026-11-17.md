@@ -142,6 +142,13 @@ Candidate assets identified by filename:
 - Static responsive-CSS inspection found mobile breakpoints at 850px and 560px on Artist Frequency; DiggerMan and Kingpin contain responsive breakpoints covering widths from 900px down to 600px (and DiggerMan also at 720px), plus `prefers-reduced-motion` and forced-colors handling. This is stylesheet/source evidence, not a rendered device preview. No Lighthouse or Core Web Vitals scores are available from this run; browser-rendered mobile layout and performance testing remain open audit gates.
 - Payment-origin source corrections and documentation are on the Artist Frequency review branch only. Supabase secret values were not read or changed, and none of the Edge Functions was deployed. At the eventual approved release, set `APP_ORIGIN`, `CORS_ALLOWED_ORIGINS` and `PAYMENT_RETURN_URL` to the selected `pages.dev` production origin and run full Paystack sandbox acceptance tests.
 
+## W3C Nu HTML validation — 2026-11-17
+
+- W3C Nu validator returned zero errors and zero warnings on the final Artist Frequency homepage, DiggerMan homepage, DiggerMan catalogue page and The Kingpin Entertainment homepage.
+- The first validation pass exposed two required-select placeholder errors on Artist Frequency, one invalid generic `aria-label` on the DiggerMan featured-release group and four gallery-article-without-heading warnings each on DiggerMan and Kingpin.
+- Corrected the Artist Frequency required selects with empty-value prompt options; changed the DiggerMan labelled release container to `role="group"`; and added visually hidden, descriptive H3 headings to the gallery-card articles on DiggerMan and Kingpin. All four main-page/catalogue validations then returned clean results.
+- A further W3C pass was attempted across all 68 DiggerMan track pages. Fifty-two returned clean validator results with no errors or warnings. Sixteen requests were intercepted by the validator's Cloudflare protection with HTTP 429 HTML challenge pages; those 16 pages were not certified by W3C in this run and are not counted as HTML failures.
+
 ## Final audit gates — all required before indexing
 1. Verify every canonical URL and one preferred host/protocol.
 2. Verify unique titles and meta descriptions on homepage, catalogue, release and important landing pages.
