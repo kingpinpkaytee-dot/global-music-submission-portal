@@ -1,11 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const productionOrigin = "https://global-music-submission-portal.pages.dev";
+const previewOriginPattern = /^https:\/\/artist-frequency-preview-[a-z0-9-]+\.vercel\.app$/i;
 const configuredOrigins = () => (Deno.env.get("CORS_ALLOWED_ORIGINS") || Deno.env.get("APP_ORIGIN") || "")
-  .split(",").map(value => value.trim()).filter(Boolean);
+  .split(",")
+  .map(value => value.trim())
+  .filter(value => value === productionOrigin || previewOriginPattern.test(value));
 const isAllowedOrigin = (origin: string) =>
-  origin === "https://globalmusicsubmissionportal.org" ||
-  origin === "https://www.globalmusicsubmissionportal.org" ||
-  /^https:\/\/artist-frequency-preview-[a-z0-9-]+\.vercel\.app$/i.test(origin) ||
+  origin === productionOrigin ||
+  previewOriginPattern.test(origin) ||
   configuredOrigins().includes(origin);
 const cors = (origin: string) => ({
   "Access-Control-Allow-Origin": origin,
@@ -33,7 +36,11 @@ Deno.serve(async (request) => {
     if (!url || !anonKey || !serviceKey || !paystackSecret || !callbackUrl) {
       return reply({ error: "Payments are not configured yet. Please contact the platform administrator." }, 503, origin);
     }
-    if (!/^https:\/\//i.test(callbackUrl)) return reply({ error: "The payment return URL is not configured securely." }, 503, origin);
+    let callbackOrigin = "";
+    try { callbackOrigin = new URL(callbackUrl).origin; } catch { /* invalid callback URL is rejected below */ }
+    if (!/^https:\/\//i.test(callbackUrl) || !isAllowedOrigin(callbackOrigin)) {
+      return reply({ error: "The payment return URL must use an active, allowed Artist Frequency site origin." }, 503, origin);
+    }
 
     const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     if (!token) return reply({ error: "Sign in is required." }, 401, origin);

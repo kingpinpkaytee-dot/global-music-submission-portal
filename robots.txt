@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 
 # Private, account-specific dashboard views are not listed in the sitemap.
-Sitemap: https://globalmusicsubmissionportal.org/sitemap.xml
+Sitemap: https://global-music-submission-portal.pages.dev/sitemap.xml

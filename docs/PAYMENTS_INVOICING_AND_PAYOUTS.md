@@ -67,16 +67,17 @@ The migration is **not applied to production**. Review and apply it only through
 
 ## Current implementation status
 
-- Provider selection: Paystack recommended, Peach secondary.
-- Database migration: drafted locally.
-- Hosted checkout Edge Functions: not yet implemented.
-- Webhook verification and credit fulfilment: not yet implemented.
-- Admin provider-link UI and connection health check: not yet implemented.
-- Artist invoice list/checkout UI: not yet implemented.
-- Provider credentials: not configured.
-- Live payment and payout: disabled.
+- Provider selection: Paystack primary, Peach secondary.
+- Read-only Supabase CLI comparison confirms local and production migration history are in sync from 0001 through 0031. Migrations 0017 and 0018 are already recorded remotely; do not reapply them.
+- Production currently lists all five payment Edge Functions as ACTIVE: `create-paystack-checkout` (v10), `payment-admin-status` (v10), `paystack-webhook` (v10), `create-premium-subscription` (v8) and `cancel-premium-subscription` (v8).
+- The review branch contains additional CORS/callback hardening for the four browser-facing functions. Those source updates have not yet been deployed to Supabase production.
+- The frontend includes the artist invoice/checkout workspace, restricted admin Payment Centre and Premium monthly subscription panel.
+- Supabase Edge Function secrets are intentionally not stored in Git. Their current values were not read or changed during this audit.
+- Read-only CORS probes confirmed the production Pages origin receives HTTP 200 preflight responses on all four browser-facing functions. The retired .org origin also still receives HTTP 200 until the review-branch CORS changes are deployed; an unrelated test origin receives HTTP 403.
+- No transaction or payment mutation was made in this audit. Complete invoice/Premium sandbox acceptance still needs to verify Paystack checkout, webhook settlement, idempotent ledger credit, subscription renewal and cancellation.
+- Artist/vendor payouts remain disabled pending provider eligibility and separate operational approval.
 
-No invoice can be paid through the platform and no paid credit package can be fulfilled until the server-side checkout, webhook, verification and admin connection work is completed and tested.
+Do not treat an invoice or Premium subscription as paid until the deployed webhook verifies the transaction with Paystack and the settlement/subscription state is confirmed in the database.
 
 
 ## Server-side functions added in the next implementation phase
@@ -84,20 +85,25 @@ No invoice can be paid through the platform and no paid credit package can be fu
 - `create-paystack-checkout`: authenticated artist only; looks up the invoice by the signed-in artist ID; calculates the amount from the stored invoice; creates a payment attempt; asks Paystack for hosted checkout; returns only the hosted URL.
 - `paystack-webhook`: JWT verification is disabled only for this provider callback; validates the raw-body `x-paystack-signature` HMAC-SHA512; deduplicates provider events; verifies the transaction directly with Paystack; checks amount and ZAR currency; invokes the atomic settlement RPC.
 - `payment-admin-status`: verifies the signed-in user and calls the existing `is_site_admin` RPC using that user's JWT; checks the server-side Paystack key with the provider; never returns the key.
+- `create-premium-subscription`: authenticated artist only; uses the configured Premium Test Mode plan and initializes the R99 ZAR/month Paystack subscription checkout.
+- `cancel-premium-subscription`: authenticated subscriber only; schedules cancellation of a verified Test Mode subscription renewal and retains Premium access through the paid period.
 - Migration `0018_verified_payment_settlement.sql`: service-role-only settlement RPC; issues purchased credits once using the unique purchase-grant ledger index; adds an admin-only artist list RPC for invoice creation.
 
 ## Required deployment sequence
 
 1. Review and apply migrations 0017 and 0018 to Supabase production through the approved migration process.
 2. Add these secrets in Supabase Project → Edge Functions → Secrets:
-   - `PAYSTACK_SECRET_KEY` (start with a test key)
-   - `APP_ORIGIN` (the exact deployed site origin, e.g. `https://artist-frequency.vercel.app`)
-   - `CORS_ALLOWED_ORIGINS` (comma-separated exact origins allowed to call browser-facing functions; include only the active production/preview origins)
-   - `PAYMENT_RETURN_URL` (an HTTPS URL on the site, e.g. `https://artist-frequency.vercel.app/?view=billing&payment=return`)
+   - `PAYSTACK_SECRET_KEY` (invoice checkout; start with a Paystack test key)
+   - `PAYSTACK_PREMIUM_TEST_SECRET_KEY` (separate Premium Test Mode key; must begin with `sk_test_`)
+   - `APP_ORIGIN` (the exact production origin: `https://global-music-submission-portal.pages.dev`)
+   - `CORS_ALLOWED_ORIGINS` (comma-separated exact origins allowed to call browser-facing functions; include the active `pages.dev` production origin and only a currently protected preview origin when it is actively used. Do not include the retired `.org` host.)
+   - `PAYMENT_RETURN_URL` (an HTTPS return URL on the active production site, e.g. `https://global-music-submission-portal.pages.dev/?view=billing&payment=return`)
    Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` to Edge Functions. Never copy the service-role key into frontend configuration.
-3. Deploy the three functions:
+3. Deploy the browser-facing invoice/Premium functions and the server-to-server webhook:
    - `npx --yes supabase@latest functions deploy create-paystack-checkout --project-ref mdcvewnevgsgmyfnybgn`
    - `npx --yes supabase@latest functions deploy payment-admin-status --project-ref mdcvewnevgsgmyfnybgn`
+   - `npx --yes supabase@latest functions deploy create-premium-subscription --project-ref mdcvewnevgsgmyfnybgn`
+   - `npx --yes supabase@latest functions deploy cancel-premium-subscription --project-ref mdcvewnevgsgmyfnybgn`
    - `npx --yes supabase@latest functions deploy paystack-webhook --project-ref mdcvewnevgsgmyfnybgn`
 4. Configure the webhook URL in the Paystack dashboard as:
    `https://mdcvewnevgsgmyfnybgn.supabase.co/functions/v1/paystack-webhook`
