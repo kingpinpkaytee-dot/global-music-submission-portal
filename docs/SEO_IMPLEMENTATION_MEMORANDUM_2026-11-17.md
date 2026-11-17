@@ -205,3 +205,8 @@ This final release record supersedes earlier sections that described the three c
 - Paystack sandbox acceptance is still pending: verify the connection, complete a test payment, and confirm webhook signature verification, payment settlement, idempotent credit grant, duplicate/failed payment handling, renewal and cancellation. Do not mark an invoice or subscription paid until the verified webhook/database state confirms it.
 - Browser-rendered mobile/keyboard/accessibility review and Core Web Vitals/Lighthouse metrics remain unverified. PageSpeed Insights returned HTTP 429 during the earlier audit; 16 DiggerMan track-page W3C submissions were rate-limited by validator Cloudflare (52 of 68 passed cleanly).
 - Search-engine indexing, Search Console sitemap submission and any indexing request remain on HOLD pending explicit owner authorisation.
+
+
+### Final deployment provenance cross-check
+
+Cloudflare's deployment history independently confirms production deployment ID `621778f3-a6f6-483e-810e-ee849eebd5c2`, environment `Production`, branch `main`, source `064b648`. A live-content comparison against GitHub main verified that all nine published public artifacts (HTML, robots, sitemap, three JavaScript modules, public config, social SVG and Google verification file) are byte-for-byte identical after normalising Windows/Unix line endings. This confirms the production alias serves the merged main-branch public files, not merely an earlier preview.
