@@ -91,9 +91,9 @@ No invoice can be paid through the platform and no paid credit package can be fu
 1. Review and apply migrations 0017 and 0018 to Supabase production through the approved migration process.
 2. Add these secrets in Supabase Project → Edge Functions → Secrets:
    - `PAYSTACK_SECRET_KEY` (start with a test key)
-   - `APP_ORIGIN` (the exact deployed site origin, e.g. `https://artist-frequency.vercel.app`)
-   - `CORS_ALLOWED_ORIGINS` (comma-separated exact origins allowed to call browser-facing functions; include only the active production/preview origins)
-   - `PAYMENT_RETURN_URL` (an HTTPS URL on the site, e.g. `https://artist-frequency.vercel.app/?view=billing&payment=return`)
+   - `APP_ORIGIN` (the exact production origin: `https://global-music-submission-portal.pages.dev`)
+   - `CORS_ALLOWED_ORIGINS` (comma-separated exact origins allowed to call browser-facing functions; include the active `pages.dev` production origin and only a currently protected preview origin when it is actively used. Do not include the retired `.org` host.)
+   - `PAYMENT_RETURN_URL` (an HTTPS return URL on the active production site, e.g. `https://global-music-submission-portal.pages.dev/?view=billing&payment=return`)
    Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` to Edge Functions. Never copy the service-role key into frontend configuration.
 3. Deploy the three functions:
    - `npx --yes supabase@latest functions deploy create-paystack-checkout --project-ref mdcvewnevgsgmyfnybgn`
