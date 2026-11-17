@@ -53,6 +53,9 @@ Candidate assets identified by filename:
 - DiggerMan repository tree confirms 68 individual track-page HTML files; all 68 were fetched and checked for a page title, meta description, canonical link, Open Graph title/description/image, Twitter card metadata and syntactically valid JSON-LD. All 68 passed this presence/syntax check.
 - DiggerMan sitemap contains 71 URL entries (homepage, music index, smartlinks page and 68 track pages) plus three image entries. The required image namespace is now declared and all image tags are balanced.
 - Cloudinary asset-library records confirm six referenced SEO images exist as public image uploads with stored source dimensions; deployed HTTP delivery, image rendering and deployed-site behaviour remain unverified.
+- Artist Frequency Organization JSON-LD was refined so the platform does not incorrectly identify the separate DiggerMan and Kingpin websites as `sameAs` profiles; platform-specific `knowsAbout` topics now describe its actual service focus.
+- DiggerMan homepage code confirms all three newly uploaded release artworks are visibly presented as featured release cards with descriptive ALT text, dimensions and lazy loading.
+- The Kingpin homepage code references the owner-selected logo in navigation, Organization JSON-LD, Open Graph/Twitter preview and its image sitemap; Riverlea archive imagery is also presented in the gallery.
 - The three live site URLs could not be retrieved by the available page-check path during this run; this is an inconclusive check, not evidence that the sites are offline.
 
 ## Final audit gates — all required before indexing
