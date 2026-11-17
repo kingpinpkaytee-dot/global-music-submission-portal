@@ -9,6 +9,8 @@ Status: IMPLEMENTATION IN PROGRESS — INDEXING HOLD
 
 Cross-site authority flow: Artist Frequency → DiggerMan Official → The Kingpin Entertainment. Each site keeps its own purpose, canonical URL, visual identity and structured data.
 
+Cross-site hostname consistency: DiggerMan Official and The Kingpin Entertainment SEO branches now link back to Artist Frequency using the selected `pages.dev` hostname. The retired `.org` hostname was checked and is absent from the homepage, robots and sitemap files on all three SEO branches. The DiggerMan and Kingpin changes remain staged in their own open draft pull requests and are not live until separately approved and released.
+
 ## Work completed in this implementation branch
 - DiggerMan homepage: improved Open Graph site identity, descriptive social-image ALT text, Twitter image ALT text and MusicGroup topical knowledge.
 - The Kingpin Entertainment homepage: expanded South African company description, company service/topic knowledge, Gauteng/Johannesburg/Riverlea service-area and locality metadata, improved Open Graph site identity and social-image ALT text.
