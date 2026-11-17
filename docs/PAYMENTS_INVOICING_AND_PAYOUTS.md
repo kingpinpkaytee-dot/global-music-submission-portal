@@ -70,10 +70,10 @@ The migration is **not applied to production**. Review and apply it only through
 - Provider selection: Paystack primary, Peach secondary.
 - Read-only Supabase CLI comparison confirms local and production migration history are in sync from 0001 through 0031. Migrations 0017 and 0018 are already recorded remotely; do not reapply them.
 - Production currently lists all five payment Edge Functions as ACTIVE: `create-paystack-checkout` (v10), `payment-admin-status` (v10), `paystack-webhook` (v10), `create-premium-subscription` (v8) and `cancel-premium-subscription` (v8).
-- The review branch contains additional CORS/callback hardening for the four browser-facing functions. Those source updates have not yet been deployed to Supabase production.
+- The four browser-facing functions received the CORS/callback hardening and were deployed to Supabase production on 2026-11-17. Read-only post-deployment preflight checks confirm the selected Pages origin is allowed and the retired .org/arbitrary origins are blocked.
 - The frontend includes the artist invoice/checkout workspace, restricted admin Payment Centre and Premium monthly subscription panel.
-- Supabase Edge Function secrets are intentionally not stored in Git. Their current values were not read or changed during this audit.
-- Read-only CORS probes confirmed the production Pages origin receives HTTP 200 preflight responses on all four browser-facing functions. The retired .org origin also still receives HTTP 200 until the review-branch CORS changes are deployed; an unrelated test origin receives HTTP 403.
+- Supabase Edge Function secrets are intentionally not stored in Git. Secret values were never printed or stored in Git. On 2026-11-17, only APP_ORIGIN, CORS_ALLOWED_ORIGINS and PAYMENT_RETURN_URL were updated to the selected Pages origin; Paystack credentials and the service-role key were not changed.
+- Post-deployment read-only CORS probes returned HTTP 200 for the selected Pages origin and HTTP 403 with no allow-origin header for both the retired .org origin and an unrelated test origin across all four browser-facing functions.
 - No transaction or payment mutation was made in this audit. Complete invoice/Premium sandbox acceptance still needs to verify Paystack checkout, webhook settlement, idempotent ledger credit, subscription renewal and cancellation.
 - Artist/vendor payouts remain disabled pending provider eligibility and separate operational approval.
 
@@ -116,4 +116,25 @@ Do not treat an invoice or Premium subscription as paid until the deployed webho
 - Payouts to artists, suppliers or third parties are intentionally not enabled. The provider's own settlement bank account is linked in the provider's official dashboard. Any later artist/vendor payout system requires separate approval, beneficiary verification, sufficient balance controls, audit logs and legal/accounting terms.
 - Invoice prices are manually entered by the administrator. The previously proposed service tariff is not activated or assumed approved.
 - Tax is zero by default. VAT must not be charged or described as applicable unless the business's VAT registration and tax obligations have been confirmed.
-- These functions and UI are source code only until migrations, secrets, function deployments, webhook registration and end-to-end sandbox testing are completed.
+- The four browser-facing functions are deployed and the production origin configuration is updated. End-to-end Paystack sandbox acceptance and webhook registration/verification remain outstanding; no real payment has been made.
+
+
+## Production deployment completion — 2026-11-17
+
+The Artist Frequency SEO PR was merged to main and deployed to the selected Cloudflare Pages production hostname. The following production configuration changes were then completed:
+
+- Supabase secrets `APP_ORIGIN`, `CORS_ALLOWED_ORIGINS` and `PAYMENT_RETURN_URL` were set to the selected production hostname, `https://global-music-submission-portal.pages.dev`. The payment return URL is `https://global-music-submission-portal.pages.dev/?view=billing&payment=return`.
+- The following four Edge Functions were deployed successfully from the merged main branch: `create-paystack-checkout`, `payment-admin-status`, `create-premium-subscription` and `cancel-premium-subscription`.
+- Post-deployment read-only preflight probes passed for each function: production Pages origin = HTTP 200 and exact allow-origin header; retired `.org` origin = HTTP 403 with no allow-origin header; unrelated external origin = HTTP 403 with no allow-origin header.
+- Existing Paystack API keys, Premium test keys, webhook keys and Supabase service-role credentials were not changed. Secret values were not retrieved or printed.
+- `paystack-webhook` was not redeployed in this release because its source was unchanged. No migrations were run; local and production histories were previously confirmed aligned through 0031.
+
+### Still required before enabling real billing
+
+- Complete the Paystack Test Mode connection check and controlled sandbox payment.
+- Verify a signed webhook updates the invoice/subscription state only after provider verification and grants credits once.
+- Test duplicate webhook, failed payment, amount/currency mismatch, renewal and cancellation.
+- Configure/verify the provider's webhook signing secret where available.
+- Keep live charging and artist/vendor payouts disabled until those checks and the provider's merchant capability checks are complete.
+
+The deployment and CORS preflight results establish correct production-origin routing; they do not constitute proof of a successful Paystack transaction or end-to-end payment settlement.
