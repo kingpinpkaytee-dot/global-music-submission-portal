@@ -1,11 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const productionOrigin = "https://global-music-submission-portal.pages.dev";
+const previewOriginPattern = /^https:\/\/artist-frequency-preview-[a-z0-9-]+\.vercel\.app$/i;
 const configuredOrigins = () => (Deno.env.get("CORS_ALLOWED_ORIGINS") || Deno.env.get("APP_ORIGIN") || "")
-  .split(",").map(value => value.trim()).filter(Boolean);
+  .split(",")
+  .map(value => value.trim())
+  .filter(value => value === productionOrigin || previewOriginPattern.test(value));
 const isAllowedOrigin = (origin: string) =>
-  origin === "https://globalmusicsubmissionportal.org" ||
-  origin === "https://www.globalmusicsubmissionportal.org" ||
-  /^https:\/\/artist-frequency-preview-[a-z0-9-]+\.vercel\.app$/i.test(origin) ||
+  origin === productionOrigin ||
+  previewOriginPattern.test(origin) ||
   configuredOrigins().includes(origin);
 const corsHeaders = (origin: string) => ({
   "Access-Control-Allow-Origin": origin,
