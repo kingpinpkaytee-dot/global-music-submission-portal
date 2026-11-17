@@ -68,11 +68,13 @@ The migration is **not applied to production**. Review and apply it only through
 ## Current implementation status
 
 - Provider selection: Paystack primary, Peach secondary.
-- Migration files 0017 and 0018 exist in the repository. Verify their remote application state with the Supabase migration list before attempting to apply or reapply them.
-- Source code includes authenticated invoice checkout, Paystack webhook verification/settlement, admin payment-status verification, Premium subscription initialization and Premium cancellation Edge Functions.
-- The frontend includes the artist invoice/checkout workspace and a restricted admin Payment Centre; the Premium monthly subscription panel and management handlers are also present.
-- Supabase Edge Function secrets are intentionally not stored in Git. Their current values and presence must be checked in the Supabase dashboard or an authenticated CLI session.
-- Production function deployment, webhook registration and complete invoice/Premium sandbox acceptance must be verified separately. The presence of source files does not prove that the functions or migrations are deployed.
+- Read-only Supabase CLI comparison confirms local and production migration history are in sync from 0001 through 0031. Migrations 0017 and 0018 are already recorded remotely; do not reapply them.
+- Production currently lists all five payment Edge Functions as ACTIVE: `create-paystack-checkout` (v10), `payment-admin-status` (v10), `paystack-webhook` (v10), `create-premium-subscription` (v8) and `cancel-premium-subscription` (v8).
+- The review branch contains additional CORS/callback hardening for the four browser-facing functions. Those source updates have not yet been deployed to Supabase production.
+- The frontend includes the artist invoice/checkout workspace, restricted admin Payment Centre and Premium monthly subscription panel.
+- Supabase Edge Function secrets are intentionally not stored in Git. Their current values were not read or changed during this audit.
+- Read-only CORS probes confirmed the production Pages origin receives HTTP 200 preflight responses on all four browser-facing functions. The retired .org origin also still receives HTTP 200 until the review-branch CORS changes are deployed; an unrelated test origin receives HTTP 403.
+- No transaction or payment mutation was made in this audit. Complete invoice/Premium sandbox acceptance still needs to verify Paystack checkout, webhook settlement, idempotent ledger credit, subscription renewal and cancellation.
 - Artist/vendor payouts remain disabled pending provider eligibility and separate operational approval.
 
 Do not treat an invoice or Premium subscription as paid until the deployed webhook verifies the transaction with Paystack and the settlement/subscription state is confirmed in the database.
