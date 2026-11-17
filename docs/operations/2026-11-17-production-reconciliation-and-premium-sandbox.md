@@ -59,19 +59,47 @@ On 17 November 2026:
 - `node --test scripts\\*.test.mjs`: 33 passed, 0 failed.
 - Tests cover internal same-tab navigation, Google/Spotify sign-in, submission auth gating, PlaylistDock seed exclusion, 15-follower playlist thresholds, individual-only opportunity review, Premium Test Mode guards, webhook signature configuration and subscription-credit settlement restrictions.
 
-## Not yet deployed or accepted
+## Deployment and HTTP verification
 
-The local function sources include the five deployed production functions and Premium Test Mode updates, but the updated local sources have not yet been redeployed to Supabase.
+The tested source was committed and pushed to GitHub `main`:
 
-Cloudflare Pages remains manually deployed with Wrangler. The latest recorded production Pages deployment was approximately one week old; no new Pages deployment has been triggered.
+- Commit: `ed95b986645ccd81936aa598e0513e19a0870940`
+- Message: `Reconcile production migrations and restore Premium sandbox flow`
+- GitHub Actions run `44056229386`: completed successfully. Its configuration, qualification, website integration test and discovery steps passed.
 
-Premium acceptance testing is not complete. Remaining checks:
+The five Supabase Edge Functions were redeployed successfully on 17 November 2026. A fresh function inventory confirmed all five are ACTIVE:
 
-1. Deploy the updated Supabase Edge Function sources and confirm the active function versions.
-2. Obtain and configure environment-specific Paystack webhook signing secrets, then verify signed Test Mode webhook delivery.
-3. As the platform administrator, check Paystack connection status and confirm the R99 ZAR monthly Test Mode plan is ready.
+| Function | Version | Updated (UTC) |
+|---|---:|---|
+| create-paystack-checkout | 10 | 09:34:04 |
+| payment-admin-status | 10 | 09:35:01 |
+| create-premium-subscription | 8 | 09:35:54 |
+| cancel-premium-subscription | 8 | 09:37:44 |
+| paystack-webhook | 10 | 09:40:04 |
+
+Cloudflare Pages production deployment completed successfully:
+
+- Deployment ID: `79510df7-cee8-4f75-8644-c63f44d37797`
+- Deployment URL: `https://79510df7.global-music-submission-portal.pages.dev`
+- Branch: `main`
+- Source commit: `ed95b98`
+- Wrangler uploaded 6 files; 2 were already present.
+
+HTTP checks returned 200 for the homepage, app module, auth module, Supabase client, public Supabase config, robots.txt, sitemap.xml and Google Search Console verification file on both the immutable deployment URL and the production `global-music-submission-portal.pages.dev` alias. The served homepage contains the Premium Test Mode panel and Google/Spotify sign-in controls; served JavaScript contains the Premium subscription handlers and both OAuth providers.
+
+CORS preflight requests from the production Pages origin returned 200 for the four browser-invoked functions: `create-paystack-checkout`, `payment-admin-status`, `create-premium-subscription` and `cancel-premium-subscription`. The Paystack webhook is a server-to-server POST endpoint, so the browser-style OPTIONS probe returned 405 as expected. An unsigned webhook POST returned 401 `Invalid signature`. Unauthenticated POSTs to all four browser-invoked functions returned 401 `Missing authorization header`. No payment or mutation was made by these probes.
+
+## Remaining acceptance items
+
+The default Cloudflare Pages domain is serving the new production deployment. The expected custom domain `globalmusicsubmissionportal.org` returned DNS NXDOMAIN from the Acer; `global-music-submission-portal.org` did as well. The custom domain therefore is not currently verifiable or reachable and needs registrar/DNS correction and Cloudflare Pages custom-domain verification. The current working production URL is `https://global-music-submission-portal.pages.dev`.
+
+Premium acceptance testing is not complete. The administrator must:
+
+1. Open Payment Centre and select **Check Paystack connection** to confirm that the R99 ZAR/month Test Mode plan is ready.
+2. Register/confirm the Paystack Test Mode webhook endpoint:
+   `https://mdcvewnevgsgmyfnybgn.supabase.co/functions/v1/paystack-webhook`.
+3. Configure the environment-specific `whsec_` webhook signing secret when available. The current handler retains legacy API-key HMAC support; no webhook signing-secret value has been exposed or changed.
 4. Complete a Test Mode subscription payment and confirm the verified webhook activates membership and grants 10 credits exactly once.
 5. Test duplicate webhook delivery, failed payment, renewal, cancellation and retention through the paid-through date.
-6. Prepare a clean static deployment directory, deploy to Cloudflare Pages and verify the served files and authentication routes.
 
-Live Premium billing remains locked. No real customer charge, production payment test or bank payout has been made or enabled.
+Live Premium billing remains locked. No real customer charge, live transaction or bank payout has been made or enabled.
