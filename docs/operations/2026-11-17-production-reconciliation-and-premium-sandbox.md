@@ -91,7 +91,7 @@ CORS preflight requests from the production Pages origin returned 200 for the fo
 
 ## Remaining acceptance items
 
-The default Cloudflare Pages domain is serving the new production deployment. The expected custom domain `globalmusicsubmissionportal.org` returned DNS NXDOMAIN from the Acer; `global-music-submission-portal.org` did as well. The custom domain therefore is not currently verifiable or reachable and needs registrar/DNS correction and Cloudflare Pages custom-domain verification. The current working production URL is `https://global-music-submission-portal.pages.dev`.
+The selected production hostname is `https://global-music-submission-portal.pages.dev`. The former `.org` hostname is retired by owner decision and must not be used in canonical tags, payment origins, OAuth redirects, callback URLs or sitemap/robots metadata. Keep `APP_ORIGIN`, `CORS_ALLOWED_ORIGINS` and `PAYMENT_RETURN_URL` aligned with the selected Pages hostname; the browser-facing Edge Functions now reject origins outside the active Pages host and the explicitly allowed protected preview host.
 
 Premium acceptance testing is not complete. The administrator must:
 
