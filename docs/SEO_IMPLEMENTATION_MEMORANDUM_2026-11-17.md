@@ -1,0 +1,58 @@
+# Three-Site SEO & Image Optimisation Memorandum
+Updated: 2026-11-17
+Status: IMPLEMENTATION IN PROGRESS — INDEXING HOLD
+
+## Network structure
+1. Artist Frequency — https://globalmusicsubmissionportal.org/
+2. DiggerMan Official — https://kingpinpkaytee-dot.github.io/diggerman-site/
+3. The Kingpin Entertainment — https://kingpinpkaytee-dot.github.io/thekingpin-entertainment-site/
+
+Cross-site authority flow: Artist Frequency → DiggerMan Official → The Kingpin Entertainment. Each site keeps its own purpose, canonical URL, visual identity and structured data.
+
+## Work completed in this implementation branch
+- DiggerMan homepage: improved Open Graph site identity, descriptive social-image ALT text, Twitter image ALT text and MusicGroup topical knowledge.
+- The Kingpin Entertainment homepage: expanded South African company description, company service/topic knowledge, Gauteng/Johannesburg/Riverlea service-area and locality metadata, improved Open Graph site identity and social-image ALT text.
+- Artist Frequency homepage: refined platform description, improved social-card type to summary_large_image, added site identity and a planned social preview asset reference.
+- Existing canonical URLs and robots directives retained.
+- Existing DiggerMan MusicGroup and The Kingpin Organization JSON-LD retained and enriched rather than replaced.
+- No search-engine indexing request has been made.
+
+## Exclusive promotional imagery source
+Authorised source folder on the user's Windows device:
+C:\Users\USER\Downloads
+
+Candidate assets identified by filename:
+- DiggerMan artist/release promotion: DiggerMan_SEGA_3000x3000.jpg; DiggerMan_Immortal_3000x3000.jpg; Digger-Man_One_Man_Show_3000x3000.jpg; CELESTIAL_FREQUENCY_2_3000x3000.jpg; celestial_frequency_3000x3000.jpg; celestial_signal_ep_cover_3000.jpg; No_Looking_Back_3000x3000.jpg; No_Looking_Back_2_3000x3000.jpg; Advertisement DiggerMan On Spotify.png; Spotify Promo Card.jpeg.
+- Company identity: The Kingpin Entertainment_Logo.png; kingpin_brand.png.
+- Riverlea visual archive: riverlea_night_rap_scene.webp; riverlea_street_crowd.webp; balcony_overlook_crowd.webp.
+- Additional release art should be selected from the Downloads folder only after visual review and relevance checks.
+
+## Required image implementation
+- Copy approved original assets into each site's own /assets/seo/ directory using descriptive, lowercase, hyphenated filenames.
+- Preserve original artwork; do not crop, repaint or invent text on release covers.
+- Generate responsive WebP/AVIF derivatives only when quality and dimensions can be preserved; keep original artwork as canonical fallback.
+- Add accurate, non-keyword-stuffed ALT text to every meaningful image.
+- Add width/height, loading=lazy for below-the-fold images, fetchpriority=high for the lead image, and explicit object-fit rules where needed.
+- Use an image-specific social preview for each brand/site, with OG/Twitter image ALT text, dimensions and type where verified.
+- Add image sitemap entries only for crawlable public image URLs.
+- Do not expose personal documents, account screenshots, certificates, credentials, or unrelated Downloads assets.
+
+## Business and entity SEO
+- The Kingpin Entertainment: retain legal name and slogan; use Organization JSON-LD; include accurate South African locality and service area; only add telephone, street address, opening hours or registration number if the owner supplies verified public details.
+- DiggerMan: MusicGroup entity with artist identity, genres, Spotify/MusicBrainz and official social links; retain release and catalogue references.
+- Artist Frequency: Organization + WebSite entities; accurately describe free independent-artist submissions, playlist and radio discovery; no unsupported placement or reach claims.
+
+## Final audit gates — all required before indexing
+1. Verify every canonical URL and one preferred host/protocol.
+2. Verify unique titles and meta descriptions on homepage, catalogue, release and important landing pages.
+3. Validate JSON-LD syntax and entity consistency.
+4. Verify every OG/Twitter image URL returns HTTP 200, is crawlable and has the correct brand artwork.
+5. Verify every image path exists, image dimensions are declared, ALT coverage is complete and file sizes are reasonable.
+6. Verify sitemap URLs are canonical, live and not blocked by robots.txt.
+7. Verify internal cross-links follow the three-site network without circular or misleading identity claims.
+8. Check mobile rendering, page performance and broken links.
+9. Run final repository and deployed-site integrity checks.
+10. Only after owner approval, submit sitemaps and request indexing.
+
+## Indexing status
+HOLD. Do not submit URLs or sitemaps to Google/Bing until all three sites pass every final audit gate and the owner explicitly authorises indexing.
