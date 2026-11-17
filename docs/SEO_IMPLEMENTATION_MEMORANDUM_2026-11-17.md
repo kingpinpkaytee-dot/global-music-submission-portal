@@ -110,6 +110,14 @@ Candidate assets identified by filename:
 - No GitHub Actions workflow runs were returned for the three current branch-head commits. The static audits above were executed directly against the checked-out branch files; they are not a substitute for browser-based mobile/performance testing.
 - The DiggerMan and Kingpin SEO changes remain in their PR branches and are not live. Artist Frequency's previously validated Cloudflare preview is separate from the unchanged `main` production deployment.
 
+## Latest DiggerMan and Kingpin verification — 2026-11-17
+
+- After the final metadata refinements, the complete DiggerMan local branch audit confirms 71 HTML pages, 101 image elements, 75 unique internal links tested with zero broken links, no missing image dimensions/ALT/loading attributes, no duplicate titles or canonicals, and valid metadata/JSON-LD across all pages. The final title-tag range is 32–61 characters; meta descriptions range from 96–160 characters.
+- DiggerMan image URL HEAD checks found no failed image requests or redirects across the 44 unique `src`/Open Graph URLs found during the crawl. The 13 Feature.fm iframe widget URLs returned HTTP 200 with HTML content types, as expected for embedded player documents.
+- The Kingpin local branch audit confirms one HTML page, six image elements, five unique internal links tested with zero broken links, a 133-character description, valid JSON-LD, and no missing image dimensions/ALT/loading attributes. All six unique image sources/Open Graph images returned HTTP 200 with image content types.
+- DiggerMan PR #7 now contains the full 71-page audit fixes and title/description refinements. The Kingpin PR #3 includes the final 133-character description and image priority correction. These changes remain on review branches.
+- Browser-rendered mobile layout, visual regression, Core Web Vitals and Lighthouse performance testing are still outstanding. The repository static checks and HTTP/link checks do not certify those browser-based measurements.
+
 ## Final audit gates — all required before indexing
 1. Verify every canonical URL and one preferred host/protocol.
 2. Verify unique titles and meta descriptions on homepage, catalogue, release and important landing pages.
