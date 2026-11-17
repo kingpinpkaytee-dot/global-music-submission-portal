@@ -103,3 +103,33 @@ Premium acceptance testing is not complete. The administrator must:
 5. Test duplicate webhook delivery, failed payment, renewal, cancellation and retention through the paid-through date.
 
 Live Premium billing remains locked. No real customer charge, live transaction or bank payout has been made or enabled.
+
+
+## SEO release and payment-origin deployment update — 2026-11-17
+
+This update records the later production release after the three-site SEO work was approved.
+
+### Main-branch merges
+- Artist Frequency PR #6: merged commit `064b648561a7c909ccba84f5d1c8803752b073ab`.
+- DiggerMan Official PR #7: merged commit `3d845ecb6d025392843175b036e9133c836c225b`.
+- The Kingpin Entertainment PR #3: merged commit `3092ca65bf8c36a86b2697d34e8b02763484e07f`.
+
+### Artist Frequency Pages production release
+- Wrangler 4.164.0 completed a production Pages deployment using the merged Artist Frequency main commit, immutable URL: https://621778f3.global-music-submission-portal.pages.dev.
+- The selected production alias https://global-music-submission-portal.pages.dev serves the updated HTML, canonical and Open Graph URL, Google verification meta tag, robots and sitemap.
+- Twenty production URL/query-route smoke checks returned HTTP 200. The homepage, robots and sitemap no longer contain the retired .org hostname.
+
+### Browser-facing Supabase functions and CORS
+- Updated only the production origin settings: `APP_ORIGIN`, `CORS_ALLOWED_ORIGINS`, `PAYMENT_RETURN_URL`. Values were not printed; Paystack and service-role keys were not modified.
+- Successfully deployed `create-paystack-checkout`, `payment-admin-status`, `create-premium-subscription` and `cancel-premium-subscription`.
+- Twelve read-only OPTIONS probes (three origins × four functions) confirmed selected Pages origin HTTP 200 with the exact allow-origin response, while retired `.org` and unrelated external origins each returned HTTP 403 with no allow-origin header.
+- `paystack-webhook` remained on its previously deployed version because its source did not change. No database migration was applied.
+
+### DiggerMan and Kingpin live checks
+- DiggerMan homepage, robots and sitemap returned HTTP 200; sitemap contains 71 page URLs and three image entries. Live homepage image checks found no failed image responses.
+- Kingpin homepage, robots and sitemap returned HTTP 200; sitemap contains one canonical page and four image entries. Live homepage image checks found no failed image responses.
+
+### Payment acceptance boundary
+No Paystack transaction, invoice settlement, subscription mutation, webhook mutation, real customer charge or artist/vendor payout was performed in this release. Premium remains Test Mode-only until the administrator completes the provider connection check, signed webhook verification, test payment, idempotent credit grant, duplicate/failed payment, renewal and cancellation tests. Any earlier statement in this record that the four browser-facing functions still allowed the retired .org origin was accurate before this update and is superseded by the post-deployment probes recorded here.
+
+Search-engine indexing and Search Console sitemap submission remain on HOLD pending explicit owner authorisation.
