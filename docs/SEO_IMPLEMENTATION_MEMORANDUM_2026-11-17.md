@@ -89,6 +89,27 @@ Candidate assets identified by filename:
 - The Google HTML verification file path currently responds with HTTP 308 and redirects to its extensionless URL due to Pages URL handling. The homepage meta-tag verification method remains available; do not claim Search Console ownership is verified until the user confirms the Search Console result.
 - The preview is a branch deployment only. The production deployment remains on `main` and was not changed. No sitemap or indexing request was submitted.
 
+## Repository-wide static audit results — 2026-11-17
+
+### DiggerMan Official — complete static HTML pass
+- The current SEO branch was cloned to the connected Acer and all 71 HTML pages were audited from the actual checked-out branch contents.
+- Across 101 image elements, zero are missing explicit width/height, descriptive ALT text, or a loading/fetch-priority instruction. The hero images receive high priority; secondary and catalogue artwork is lazy-loaded.
+- All 71 pages have a title, unique canonical URL, meta description, Open Graph image metadata, Twitter card/title/description/image ALT metadata and valid JSON-LD. Each page has exactly one H1. No duplicate titles or canonicals were detected.
+- Meta description lengths now range from 96 to 160 characters; zero pages exceed 160 characters.
+- The DiggerMan sitemap contains 71 unique canonical URLs and three image entries, with the required image namespace. Its robots file points to that sitemap. The retired `.org` hostname is absent from the 71 HTML pages, robots file and sitemap.
+- The three primary DiggerMan social-preview and release-cover assets were checked for live image delivery; the preferred-portrait social card derivative returns HTTP 200 at 1200×630.
+
+### The Kingpin Entertainment — homepage static pass
+- All six homepage images have explicit dimensions and ALT text, plus either lazy loading or high fetch priority. The selected company-logo image and Riverlea archive image retain their correct artwork.
+- Homepage title, 133-character meta description, canonical, Open Graph and Twitter image metadata pass the static checks. JSON-LD parses successfully and contains one H1.
+- The Organization entity retains verified South African/Gauteng/Johannesburg service-area details and the public contact channel, but no unverified postal address or misleading DiggerMan social-profile `sameAs` links.
+- The sitemap contains one canonical URL and four image entries; the image namespace and robots sitemap reference are present. The retired `.org` hostname is absent from the homepage, robots file and sitemap.
+
+### Pull-request and workflow state
+- Artist Frequency PR #6, DiggerMan PR #7 and The Kingpin Entertainment PR #3 remain open, draft and unmerged.
+- No GitHub Actions workflow runs were returned for the three current branch-head commits. The static audits above were executed directly against the checked-out branch files; they are not a substitute for browser-based mobile/performance testing.
+- The DiggerMan and Kingpin SEO changes remain in their PR branches and are not live. Artist Frequency's previously validated Cloudflare preview is separate from the unchanged `main` production deployment.
+
 ## Final audit gates — all required before indexing
 1. Verify every canonical URL and one preferred host/protocol.
 2. Verify unique titles and meta descriptions on homepage, catalogue, release and important landing pages.
