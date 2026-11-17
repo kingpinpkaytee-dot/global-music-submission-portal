@@ -62,6 +62,24 @@ Candidate assets identified by filename:
 - DiggerMan and The Kingpin GitHub Pages sites both returned HTTP 200. All six selected Cloudinary promotional/logo/archive image URLs returned HTTP 200 with image content types. Artist Frequency production HTML/robots/sitemap still require promotion of the verified SEO branch; the branch preview now passes its HTTP smoke checks.
 - Initial direct production checks showed HTTP 200 for the homepage but legacy `.org` references in the production `robots.txt`, sitemap and HTML. This confirms production has not received the corrected SEO-branch content. The separate branch preview now serves the corrected `pages.dev` canonical/OG URL and preserved Google verification meta tag. Production remains unchanged pending the complete three-site audit and explicit production-release authorisation.
 
+## Cross-site image and entity refinements — 2026-11-17
+
+### DiggerMan Official
+- The homepage social preview now uses the high-resolution preferred artist portrait through a non-cropping Cloudinary 1200×630 JPEG derivative. The image was verified at HTTP 200 and its actual output dimensions were measured as 1200×630.
+- The homepage's seven displayed images now include explicit width/height, descriptive ALT text and asynchronous decoding. The primary hero portrait has high fetch priority; secondary images are lazy-loaded.
+- The 25 cover images on the music catalogue page and the SmartLinks hero image now declare verified square dimensions (640×640 for Spotify artwork and 1000×1000 for the Apple Music artwork), with ALT text and asynchronous decoding. Catalogue images remain lazy-loaded; the SmartLinks hero receives high priority.
+- All 68 individual track pages were updated: their Spotify artwork (640×640) or Apple Music artwork (1000×1000) now has explicit width/height, high fetch priority and asynchronous decoding. Open Graph image type/dimensions and Twitter image ALT/title/description metadata are included. MusicRecording `sameAs` lists were cleaned so artist and album URLs are not incorrectly asserted as equivalent to an individual recording.
+- Repository-level spot checks confirmed JSON-LD remains valid on the homepage, catalogue, SmartLinks page and sampled track pages. The existing track-page metadata audit had already found unique titles/canonicals, descriptions, OG metadata and valid MusicRecording JSON-LD across all 68 pages.
+
+### The Kingpin Entertainment
+- The homepage's six displayed images now have explicit width/height and descriptive ALT text; asynchronous decoding was added to the updated images. The hero portrait receives high fetch priority, and the social preview is explicitly described as a 1200×630 JPEG.
+- Company Organization JSON-LD no longer labels DiggerMan artist profiles as equivalent profiles of the company and no longer asserts an unverified postal address. The verified company identity, contact email, service area and the separate DiggerMan MusicGroup entity are retained.
+- JSON-LD parses successfully after the entity refinement; the homepage sitemap still contains one canonical page and four image entries.
+
+### Network-wide consistency
+- The retired `.org` hostname has zero occurrences in the homepage, robots file and sitemap of all three SEO branches. The Artist Frequency `.pages.dev` hostname is used for the two cross-site links from DiggerMan and Kingpin.
+- All three sites remain separate properties with distinct canonical URLs and entity identities. Changes in the DiggerMan and Kingpin branches are still preview-only GitHub PR changes and are not live.
+
 ## Cloudflare Pages preview deployment validation — 2026-11-17
 
 - A sanitized static publish directory was built from the SEO branch. It contains only the public site entry point, robots/sitemap, Google verification file, public Supabase browser configuration, the three application modules and the public SEO asset. Repository documentation, workflow files, scripts, SQL migrations and sample environment files were excluded from the upload.
