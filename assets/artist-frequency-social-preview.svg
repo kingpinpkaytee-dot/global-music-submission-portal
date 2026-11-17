@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+<title id="title">Artist Frequency — Global Music Discovery</title>
+<desc id="desc">Artist Frequency connects independent artists with playlist curators, radio stations and worldwide music discovery opportunities.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#080b13"/><stop offset=".55" stop-color="#18243a"/><stop offset="1" stop-color="#090b12"/></linearGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffe7a8"/><stop offset=".5" stop-color="#f2c66d"/><stop offset="1" stop-color="#a9752f"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#e9b85e" stop-opacity=".3"/><stop offset="1" stop-color="#e9b85e" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="1200" height="630" fill="url(#bg)"/>
+<circle cx="1000" cy="120" r="360" fill="url(#glow)"/>
+<path d="M0 520 C190 420 310 610 500 500 S820 390 1200 500" fill="none" stroke="#f2c66d" stroke-opacity=".16" stroke-width="2"/>
+<path d="M0 548 C190 448 310 638 500 528 S820 418 1200 528" fill="none" stroke="#77d9dc" stroke-opacity=".18" stroke-width="2"/>
+<rect x="84" y="86" width="92" height="92" rx="24" fill="url(#gold)"/>
+<path d="M111 151 L130 108 L149 151 M119 134 H141" fill="none" stroke="#17120a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="204" y="130" fill="#f4f6fb" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" letter-spacing="5">GLOBAL MUSIC DISCOVERY</text>
+<text x="84" y="300" fill="#f4f6fb" font-family="Arial,Helvetica,sans-serif" font-size="82" font-weight="800" letter-spacing="-3">ARTIST</text>
+<text x="84" y="390" fill="url(#gold)" font-family="Arial,Helvetica,sans-serif" font-size="92" font-weight="900" letter-spacing="-4">FREQUENCY</text>
+<text x="90" y="454" fill="#c5cede" font-family="Arial,Helvetica,sans-serif" font-size="27">Independent artists. More ears. Worldwide opportunities.</text>
+<g transform="translate(90 520)" fill="none" stroke-width="5" stroke-linecap="round">
+ <path d="M0 0 V-20 M18 0 V-35 M36 0 V-12 M54 0 V-46 M72 0 V-26 M90 0 V-58 M108 0 V-18 M126 0 V-38 M144 0 V-10 M162 0 V-28" stroke="#f2c66d"/>
+</g>
+<text x="1090" y="560" text-anchor="end" fill="#9da9bf" font-family="Arial,Helvetica,sans-serif" font-size="18" letter-spacing="3">PLAYLISTS  •  RADIO  •  DISCOVERY</text>
+</svg>
