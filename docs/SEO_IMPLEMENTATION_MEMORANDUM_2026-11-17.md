@@ -122,6 +122,14 @@ Candidate assets identified by filename:
 - DiggerMan PR #7 now contains the full 71-page audit fixes and title/description refinements. The Kingpin PR #3 includes the final 133-character description and image priority correction. These changes remain on review branches.
 - Browser-rendered mobile layout, visual regression, Core Web Vitals and Lighthouse performance testing are still outstanding. The repository static checks and HTTP/link checks do not certify those browser-based measurements.
 
+## Payment-origin consistency check — 2026-11-17
+
+- The full Artist Frequency SEO branch scan found four Supabase browser-facing Edge Functions whose CORS code still explicitly allowed the retired `.org` hostname and did not include the selected Cloudflare Pages production origin.
+- Corrected `create-paystack-checkout`, `payment-admin-status`, `create-premium-subscription` and `cancel-premium-subscription` on the review branch. They now allow the exact production origin `https://global-music-submission-portal.pages.dev` and the explicitly recognized protected Vercel preview pattern; environment-configured origins are restricted to those active hosts, so a stale `.org` or arbitrary external origin is ignored.
+- The Paystack invoice checkout function now also rejects a configured callback URL unless its origin is HTTPS and passes the active-origin allowlist. Premium subscription checkout builds its return URL from the already-validated request origin.
+- Local logic tests passed for: allow production Pages origin; allow the explicitly recognized preview origin; reject the retired `.org` origin even when it appears in stale environment configuration; reject an arbitrary external origin.
+- Payment deployment secrets still need to be confirmed/set to the Pages origin (`APP_ORIGIN`, `CORS_ALLOWED_ORIGINS`, and `PAYMENT_RETURN_URL`) during the approved production release. Supabase secrets were not read or changed, and no Edge Function was deployed from this review branch.
+
 ## Final audit gates — all required before indexing
 1. Verify every canonical URL and one preferred host/protocol.
 2. Verify unique titles and meta descriptions on homepage, catalogue, release and important landing pages.
