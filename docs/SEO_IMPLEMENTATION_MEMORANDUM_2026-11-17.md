@@ -15,6 +15,8 @@ Cross-site authority flow: Artist Frequency → DiggerMan Official → The Kingp
 - Artist Frequency homepage: refined platform description, improved social-card type to summary_large_image, added site identity and a planned social preview asset reference.
 - Existing canonical URLs and robots directives retained.
 - Existing DiggerMan MusicGroup and The Kingpin Organization JSON-LD retained and enriched rather than replaced.
+- Cloudinary asset-library verification confirms the six referenced SEO image assets exist as public image uploads; stored source dimensions are 1200×630 for Artist Frequency, 3000×3000 for the three DiggerMan release artworks, 1254×1254 for the selected Kingpin logo and 1376×1824 for the Riverlea archive image. This confirms asset records and dimensions, not deployed HTTP delivery status.
+- DiggerMan sitemap XML image namespace defect identified during review and corrected on its SEO branch; `image:image` and `image:loc` elements now have the required `xmlns:image` declaration.
 - No search-engine indexing request has been made.
 
 ## Exclusive promotional imagery source
