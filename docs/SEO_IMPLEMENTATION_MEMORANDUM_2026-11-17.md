@@ -99,6 +99,10 @@ Candidate assets identified by filename:
 - The DiggerMan sitemap contains 71 unique canonical URLs and three image entries, with the required image namespace. Its robots file points to that sitemap. The retired `.org` hostname is absent from the 71 HTML pages, robots file and sitemap.
 - The three primary DiggerMan social-preview and release-cover assets were checked for live image delivery; the preferred-portrait social card derivative returns HTTP 200 at 1200×630.
 
+### Static accessibility checks (DiggerMan and Kingpin)
+- A static HTML accessibility pass across all 71 DiggerMan pages and the Kingpin homepage found no missing document language, viewport declaration, page-level H1, duplicate IDs, unnamed buttons, unnamed links or iframes without titles.
+- This is a source-code/static accessibility check only. It does not replace keyboard, screen-reader, contrast, zoom or real-browser interaction testing.
+
 ### The Kingpin Entertainment — homepage static pass
 - All six homepage images have explicit dimensions and ALT text, plus either lazy loading or high fetch priority. The selected company-logo image and Riverlea archive image retain their correct artwork.
 - Homepage title, 133-character meta description, canonical, Open Graph and Twitter image metadata pass the static checks. JSON-LD parses successfully and contains one H1.
