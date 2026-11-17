@@ -133,3 +133,18 @@ This update records the later production release after the three-site SEO work w
 No Paystack transaction, invoice settlement, subscription mutation, webhook mutation, real customer charge or artist/vendor payout was performed in this release. Premium remains Test Mode-only until the administrator completes the provider connection check, signed webhook verification, test payment, idempotent credit grant, duplicate/failed payment, renewal and cancellation tests. Any earlier statement in this record that the four browser-facing functions still allowed the retired .org origin was accurate before this update and is superseded by the post-deployment probes recorded here.
 
 Search-engine indexing and Search Console sitemap submission remain on HOLD pending explicit owner authorisation.
+
+
+### Post-release Edge Function inventory
+
+A fresh Supabase production inventory after deployment confirms all five payment functions are ACTIVE:
+
+| Function | Version | Updated (UTC) |
+|---|---:|---|
+| create-paystack-checkout | 12 | 19:55:06 |
+| payment-admin-status | 12 | 19:55:49 |
+| create-premium-subscription | 10 | 19:56:24 |
+| cancel-premium-subscription | 10 | 19:56:54 |
+| paystack-webhook | 11 | 09:40:04 |
+
+The four browser-facing functions show the post-release versions above. The webhook remains on its existing active version because no webhook source change was part of this origin-hardening release.
