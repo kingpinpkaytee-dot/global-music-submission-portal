@@ -120,6 +120,23 @@ test("music submission requires authentication and redirects to sign-in without 
   assert.ok(guard.includes("window.location.assign"));
 });
 
+test("sign-in handlers are registered before asynchronous session restoration", () => {
+  const configuredBranch = auth.indexOf("} else {");
+  const sessionRestore = auth.indexOf("await supabase.auth.getSession()");
+  assert.ok(configuredBranch >= 0 && sessionRestore > configuredBranch);
+  for (const marker of [
+    'document.getElementById("emailSignIn")?.addEventListener("click"',
+    'document.getElementById("googleSignIn")?.addEventListener("click"',
+    'document.getElementById("spotifySignIn")?.addEventListener("click"'
+  ]) {
+    const handler = auth.indexOf(marker, configuredBranch);
+    assert.ok(handler > configuredBranch && handler < sessionRestore, marker);
+  }
+  assert.ok(auth.indexOf('window.dispatchEvent(new CustomEvent("artistfrequency:auth-ready"))') < sessionRestore);
+  assert.ok(html.includes('<link rel="modulepreload" href="./src/auth.js">'));
+  assert.ok(html.includes('<link rel="modulepreload" href="./src/supabase-client.js">'));
+});
+
 test("Google and Spotify OAuth sign-in use the Supabase OAuth providers", () => {
   assert.ok(auth.includes('provider: "google"'));
   assert.ok(auth.includes('provider: "spotify"'));

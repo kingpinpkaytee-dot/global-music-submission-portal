@@ -54,14 +54,8 @@ if (!isSupabaseConfigured || !supabase) {
     if (googleNotice) googleNotice.textContent = "Sign-in is not configured.";
   });
 } else {
-  try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    publishSession(data.session);
-  } catch (error) {
-    showAuthMessage(error.message || "Could not restore your sign-in session.", true);
-  }
-
+  // Register session notifications and user actions before restoring storage.
+  // A slow persisted-session read must never leave visible sign-in buttons inert.
   supabase.auth.onAuthStateChange((_event, session) => publishSession(session));
 
   document.getElementById("authPreviewForm")?.addEventListener("submit", async event => {
@@ -168,5 +162,15 @@ if (!isSupabaseConfigured || !supabase) {
   }
   if (spotifyNotice) {
     spotifyNotice.textContent = "Spotify sign-in returns to Artist Frequency after authorisation; your Spotify identity remains the selected sign-in provider.";
+  }
+
+  // Signal readiness once all handlers are installed, then restore a saved session.
+  window.dispatchEvent(new CustomEvent("artistfrequency:auth-ready"));
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    publishSession(data.session);
+  } catch (error) {
+    showAuthMessage(error.message || "Could not restore your sign-in session.", true);
   }
 }
