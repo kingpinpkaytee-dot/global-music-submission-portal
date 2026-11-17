@@ -1,6 +1,8 @@
 # Three-Site SEO & Image Optimisation Memorandum
 Updated: 2026-11-17
-Status: IMPLEMENTATION IN PROGRESS — INDEXING HOLD
+Status: PRODUCTION DEPLOYED — INDEXING HOLD
+
+The initial audit sections below preserve the sequence of earlier work. Any earlier statement that a pull request, site deployment or payment-origin update was still pending is superseded by the final production release record at the end of this memorandum.
 
 ## Network structure
 1. Artist Frequency — https://global-music-submission-portal.pages.dev/ (Cloudflare Pages hostname; selected canonical host). The former `.org` hostname is retired and must not be used.
@@ -172,3 +174,34 @@ Candidate assets identified by filename:
 
 ## Indexing status
 HOLD. Do not submit URLs or sitemaps to Google/Bing until all three sites pass every final audit gate and the owner explicitly authorises indexing.
+
+
+## Production release completion — 2026-11-17
+
+This final release record supersedes earlier sections that described the three changes as drafts, preview-only, or awaiting production approval. The owner explicitly authorised production deployment and merging all three SEO pull requests.
+
+### GitHub merges
+- Artist Frequency PR #6 merged to `main`: `064b648561a7c909ccba84f5d1c8803752b073ab`.
+- DiggerMan Official PR #7 merged to `main`: `3d845ecb6d025392843175b036e9133c836c225b`.
+- The Kingpin Entertainment PR #3 merged to `main`: `3092ca65bf8c36a86b2697d34e8b02763484e07f`.
+- All three pull requests are closed and report `merged=true`.
+
+### Live website deployments
+- Artist Frequency was uploaded to Cloudflare Pages production from sanitized public files using Wrangler 4.164.0, with commit hash `064b648561a7c909ccba84f5d1c8803752b073ab`. Wrangler reported `Deployment complete` and returned immutable deployment URL: https://621778f3.global-music-submission-portal.pages.dev. The selected production alias https://global-music-submission-portal.pages.dev/ now serves the new homepage.
+- Production verification checked 20 URLs (homepage, robots, sitemap, public JavaScript/configuration, social SVG, Google verification path and dashboard/account/marketplace/billing/admin query routes). All 20 returned HTTP 200.
+- The live Artist Frequency homepage canonical and Open Graph URL both resolve to the selected `pages.dev` hostname. The Google verification meta tag remains present; required select placeholders remain intact. The homepage, robots and sitemap contain no retired `.org` hostname. Robots and sitemap use the selected production origin.
+- DiggerMan Official GitHub Pages homepage, `robots.txt` and `sitemap.xml` returned HTTP 200 after merge. The 71-page sitemap and three image entries are live; sampled live homepage image sources had no failed responses.
+- The Kingpin Entertainment GitHub Pages homepage, `robots.txt` and `sitemap.xml` returned HTTP 200 after merge. The sitemap contains one canonical page and four image entries; sampled live homepage image sources had no failed responses.
+- GitHub Pages response headers show the DiggerMan and Kingpin sites were rebuilt after their merge commits. The live homepage canonical URLs remain their respective GitHub Pages hostnames.
+
+### Supabase payment-origin production correction
+- Updated production secrets `APP_ORIGIN`, `CORS_ALLOWED_ORIGINS` and `PAYMENT_RETURN_URL` to the selected production origin. The return URL is `https://global-music-submission-portal.pages.dev/?view=billing&payment=return`. Secret values were not printed or stored in Git; existing Paystack credentials and service-role credentials were not changed.
+- Deployed the four updated browser-facing Edge Functions to Supabase production: `create-paystack-checkout`, `payment-admin-status`, `create-premium-subscription` and `cancel-premium-subscription`. Each deployment command completed successfully. `paystack-webhook` was not redeployed because its source was unchanged.
+- Post-deployment read-only OPTIONS probes tested three origins against each of the four deployed functions (12 probes total). All four functions returned HTTP 200 with `Access-Control-Allow-Origin: https://global-music-submission-portal.pages.dev` for the selected production site. All four returned HTTP 403 with no CORS allow-origin header for the retired `.org` host and for `https://evil.example`.
+- This closes the old-origin CORS blocker observed earlier in the audit. No payment POST, Paystack transaction, subscription creation/cancellation, webhook mutation or customer charge was performed.
+
+### Remaining release acceptance boundaries
+- Supabase migrations 0001–0031 remain aligned; no migration was applied during this SEO release.
+- Paystack sandbox acceptance is still pending: verify the connection, complete a test payment, and confirm webhook signature verification, payment settlement, idempotent credit grant, duplicate/failed payment handling, renewal and cancellation. Do not mark an invoice or subscription paid until the verified webhook/database state confirms it.
+- Browser-rendered mobile/keyboard/accessibility review and Core Web Vitals/Lighthouse metrics remain unverified. PageSpeed Insights returned HTTP 429 during the earlier audit; 16 DiggerMan track-page W3C submissions were rate-limited by validator Cloudflare (52 of 68 passed cleanly).
+- Search-engine indexing, Search Console sitemap submission and any indexing request remain on HOLD pending explicit owner authorisation.
