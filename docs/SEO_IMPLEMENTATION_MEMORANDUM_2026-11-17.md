@@ -130,6 +130,15 @@ Candidate assets identified by filename:
 - Local logic tests passed for: allow production Pages origin; allow the explicitly recognized preview origin; reject the retired `.org` origin even when it appears in stale environment configuration; reject an arbitrary external origin.
 - Payment deployment secrets still need to be confirmed/set to the Pages origin (`APP_ORIGIN`, `CORS_ALLOWED_ORIGINS`, and `PAYMENT_RETURN_URL`) during the approved production release. Supabase secrets were not read or changed, and no Edge Function was deployed from this review branch.
 
+## Final Artist Frequency and payment-origin checks — 2026-11-17
+
+- Artist Frequency's Cloudflare preview returned HTTP 200 for all 14 local page/module routes referenced by its homepage, including dashboard, submissions, discover, marketplace, campaigns, profile, account, stats, premium, billing and admin query routes. No failed local references were found.
+- Static accessibility checks on Artist Frequency found one H1, document language, viewport declaration, no duplicate IDs, no unnamed links/buttons, and all 53 visible form controls associated with labels (explicit or wrapping). The page contains seven forms, 23 buttons and 41 links. CSS includes responsive breakpoints at 850px and 560px.
+- A repository-wide text/source scan after the origin corrections found zero occurrences of the retired `.org` hostname in 29 scanned Artist Frequency text/source files, 83 DiggerMan files or 12 Kingpin files.
+- All four updated browser-facing Supabase TypeScript functions successfully transpiled with esbuild 0.28.2. CORS/callback logic tests passed: production Pages origin accepted; the protected preview origin accepted; retired `.org`, HTTP and arbitrary external origins rejected. The branch filter ignores stale environment entries that do not match the active production/preview origins.
+- Google PageSpeed Insights returned HTTP 429 quota-exceeded responses for all three site requests. No Lighthouse or Core Web Vitals scores are available from this run; browser-rendered mobile layout and performance testing remain open audit gates.
+- Payment-origin source corrections and documentation are on the Artist Frequency review branch only. Supabase secret values were not read or changed, and none of the Edge Functions was deployed. At the eventual approved release, set `APP_ORIGIN`, `CORS_ALLOWED_ORIGINS` and `PAYMENT_RETURN_URL` to the selected `pages.dev` production origin and run full Paystack sandbox acceptance tests.
+
 ## Final audit gates — all required before indexing
 1. Verify every canonical URL and one preferred host/protocol.
 2. Verify unique titles and meta descriptions on homepage, catalogue, release and important landing pages.
