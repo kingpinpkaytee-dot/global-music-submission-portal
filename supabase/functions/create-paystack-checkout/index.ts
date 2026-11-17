@@ -36,7 +36,11 @@ Deno.serve(async (request) => {
     if (!url || !anonKey || !serviceKey || !paystackSecret || !callbackUrl) {
       return reply({ error: "Payments are not configured yet. Please contact the platform administrator." }, 503, origin);
     }
-    if (!/^https:\/\//i.test(callbackUrl)) return reply({ error: "The payment return URL is not configured securely." }, 503, origin);
+    let callbackOrigin = "";
+    try { callbackOrigin = new URL(callbackUrl).origin; } catch { /* invalid callback URL is rejected below */ }
+    if (!/^https:\/\//i.test(callbackUrl) || !isAllowedOrigin(callbackOrigin)) {
+      return reply({ error: "The payment return URL must use an active, allowed Artist Frequency site origin." }, 503, origin);
+    }
 
     const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     if (!token) return reply({ error: "Sign in is required." }, 401, origin);
