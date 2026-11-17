@@ -1,7 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const allowedOrigins = () => (Deno.env.get("CORS_ALLOWED_ORIGINS") || Deno.env.get("APP_ORIGIN") || "")
+const configuredOrigins = () => (Deno.env.get("CORS_ALLOWED_ORIGINS") || Deno.env.get("APP_ORIGIN") || "")
   .split(",").map(value => value.trim()).filter(Boolean);
+const isAllowedOrigin = (origin: string) =>
+  origin === "https://globalmusicsubmissionportal.org" ||
+  origin === "https://www.globalmusicsubmissionportal.org" ||
+  /^https:\/\/artist-frequency-preview-[a-z0-9-]+\.vercel\.app$/i.test(origin) ||
+  configuredOrigins().includes(origin);
 const cors = (origin: string) => ({
   "Access-Control-Allow-Origin": origin,
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -14,17 +19,17 @@ const reply = (body: unknown, status: number, origin: string) =>
 Deno.serve(async (request) => {
   const origin = request.headers.get("origin") || "";
   if (request.method === "OPTIONS") {
-    if (!allowedOrigins().includes(origin)) return new Response("Origin not allowed", { status: 403 });
+    if (!isAllowedOrigin(origin)) return new Response("Origin not allowed", { status: 403 });
     return new Response("ok", { headers: cors(origin) });
   }
-  if (request.method !== "POST" || !allowedOrigins().includes(origin)) return reply({ error: "Request not allowed." }, 403, origin);
+  if (request.method !== "POST" || !isAllowedOrigin(origin)) return reply({ error: "Request not allowed." }, 403, origin);
 
   try {
     const url = Deno.env.get("SUPABASE_URL") || "";
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const paystackSecret = Deno.env.get("PAYSTACK_SECRET_KEY") || "";
-    const callbackUrl = Deno.env.get("PAYMENT_RETURN_URL") || "";
+    const callbackUrl = Deno.env.get("PAYMENT_RETURN_URL") || new URL("/?view=billing&payment=return", origin).toString();
     if (!url || !anonKey || !serviceKey || !paystackSecret || !callbackUrl) {
       return reply({ error: "Payments are not configured yet. Please contact the platform administrator." }, 503, origin);
     }

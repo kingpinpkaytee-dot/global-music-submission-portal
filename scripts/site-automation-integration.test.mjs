@@ -11,9 +11,16 @@ const html = read("../index.html");
 const app = read("../src/app.js");
 const auth = read("../src/auth.js");
 const worker = read("./hourly-opportunity-discovery.mjs");
+const migration24 = read("../supabase/migrations/0024_google_search_submission_candidates.sql");
 const migration28 = read("../supabase/migrations/0028_autonomous_verified_opportunity_publication.sql");
 const migration29 = read("../supabase/migrations/0029_harden_autonomous_playlist_publication.sql");
 const migration30 = read("../supabase/migrations/0030_playlist_minimum_followers_15.sql");
+const premiumMigration31 = read("../supabase/migrations/0031_artist_premium_subscriptions.sql");
+const createPremiumFunction = read("../supabase/functions/create-premium-subscription/index.ts");
+const cancelPremiumFunction = read("../supabase/functions/cancel-premium-subscription/index.ts");
+const paymentAdminFunction = read("../supabase/functions/payment-admin-status/index.ts");
+const paystackWebhookFunction = read("../supabase/functions/paystack-webhook/index.ts");
+const supabaseConfig = read("../supabase/config.toml");
 const workflow = read("../.github/workflows/hourly-opportunity-discovery.yml");
 
 test("embedded website routing scripts parse as JavaScript", () => {
@@ -26,6 +33,11 @@ test("embedded website routing scripts parse as JavaScript", () => {
     });
   assert.ok(scripts.length >= 1, "expected at least one executable inline script");
   for (const [, , source] of scripts) new vm.Script(source, { filename: "index.html:inline-script" });
+});
+
+test("legacy public-search candidate seed excludes prohibited PlaylistDock entries", () => {
+  assert.ok(migration24.includes("WHERE v.name NOT ILIKE 'PlaylistDock%'"));
+  assert.ok(migration24.includes("AND NOT EXISTS"));
 });
 
 test("internal Artist Frequency navigation always replaces the current tab", () => {
@@ -74,6 +86,7 @@ test("internal Artist Frequency navigation always replaces the current tab", () 
   let defaultPrevented = false;
   const internalAnchor = { target: "_blank", getAttribute: () => "?view=submissions" };
   clickHandler({
+    button: 0,
     target: { closest: () => internalAnchor },
     preventDefault() { defaultPrevented = true; }
   });
@@ -85,6 +98,7 @@ test("internal Artist Frequency navigation always replaces the current tab", () 
   defaultPrevented = false;
   const externalAnchor = { target: "_blank", getAttribute: () => "https://open.spotify.com/playlist/example" };
   clickHandler({
+    button: 0,
     target: { closest: () => externalAnchor },
     preventDefault() { defaultPrevented = true; }
   });
@@ -113,7 +127,11 @@ test("Google and Spotify OAuth sign-in use the Supabase OAuth providers", () => 
   assert.ok(html.includes('id="spotifySignIn"'));
   assert.ok(html.includes('id="spotifyNotice"'));
   assert.ok(auth.includes('scopes: "user-read-email"'));
-  assert.ok(auth.includes("window.location.origin + window.location.pathname + window.location.search"));
+  assert.ok(auth.includes("function callbackUrl()"));
+  assert.ok(auth.includes('window.location.origin + "/?view=account&authCallback=1"'));
+  assert.ok(auth.includes('localStorage.setItem("artistFrequencyPostAuthRoute", route)'));
+  assert.ok(auth.includes('sessionStorage.setItem("artistFrequencyPostAuthRoute", route)'));
+  assert.ok(auth.includes("redirectTo: callbackUrl()"));
   assert.ok(!auth.includes('/?view=account&authRequired=submission'), "ordinary sign-ins must not be forced to the submissions page");
 });
 
@@ -123,13 +141,43 @@ test("Premium pricing routes from public navigation and dashboard", () => {
   assert.ok(html.includes('premium: "premium-access"'));
   assert.ok(html.includes('href="?view=premium"'));
   assert.ok(html.includes("R99"));
-  assert.ok(html.includes("Premium activation pending"));
-  assert.ok(html.includes("PRE-LAUNCH STATUS"));
+  assert.ok(html.includes('id="premiumSubscribeButton"'));
+  assert.ok(html.includes('id="premiumMembershipStatus"'));
+  assert.ok(html.includes("R99"));
 });
 
-test("Premium checkout is not exposed as an enabled purchase before billing launch", () => {
-  assert.match(html, /<button[^>]*disabled[^>]*>Premium activation pending<\/button>/);
-  assert.match(html, /recurring billing[^<]*must pass production tests/i);
+test("Premium checkout is sandbox-gated and never activates from a browser return", () => {
+  assert.ok(html.includes('id="premiumSubscribeButton"'));
+  assert.ok(html.includes("TEST MODE ONLY — NO LIVE CHARGES"));
+  assert.ok(app.includes('invoke("create-premium-subscription"'));
+  assert.ok(app.includes('invoke("cancel-premium-subscription"'));
+  assert.ok(app.includes("signed and verified payment webhook"));
+  assert.ok(app.includes("loadPremiumSubscription()"));
+  assert.ok(app.includes('byId("premiumSubscribeButton")?.addEventListener'));
+  assert.ok(app.includes('byId("premiumCancelButton")?.addEventListener'));
+  assert.ok(app.includes('window.location.origin + "/?view=premium"'));
+  assert.ok(createPremiumFunction.includes('secret.startsWith("sk_test_")'));
+  assert.ok(createPremiumFunction.includes('Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRET_KEY")'));
+  assert.ok(createPremiumFunction.includes('Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRETE_KEY")'));
+  assert.ok(createPremiumFunction.includes("amount: 9900"));
+  assert.ok(createPremiumFunction.includes('currency: "ZAR"'));
+  assert.ok(!createPremiumFunction.includes("PAYSTACK_ALLOW_LIVE_PREMIUM"));
+  assert.ok(cancelPremiumFunction.includes('secret.startsWith("sk_test_")'));
+  assert.ok(cancelPremiumFunction.includes("/subscription/disable"));
+  assert.ok(paymentAdminFunction.includes('Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRETE_KEY")'));
+  assert.ok(paymentAdminFunction.includes("ensureTestPremiumPlan"));
+  assert.ok(paystackWebhookFunction.includes('Deno.env.get("PAYSTACK_TEST_WEBHOOK_SECRET")'));
+  assert.ok(paystackWebhookFunction.includes('Deno.env.get("PAYSTACK_WEBHOOK_SECRET")'));
+  assert.ok(paystackWebhookFunction.includes('Deno.env.get("PAYSTACK_PREMIUM_TEST_SECRETE_KEY")'));
+  assert.ok(paystackWebhookFunction.includes("Paystack-Signature"));
+  assert.ok(paystackWebhookFunction.includes("x-paystack-signature"));
+  assert.ok(paystackWebhookFunction.includes("Math.abs(now - signedAt) <= 300"));
+  assert.ok(paystackWebhookFunction.includes('environment !== "test"'));
+  assert.ok(premiumMigration31.includes("artist_subscription_credit_grants"));
+  assert.ok(premiumMigration31.includes("REVOKE ALL ON FUNCTION"));
+  assert.ok(premiumMigration31.includes("TO service_role"));
+  assert.ok(supabaseConfig.includes("[functions.paystack-webhook]"));
+  assert.ok(supabaseConfig.includes("verify_jwt = false"));
 });
 
 test("website directory reader displays only active, verified public records", () => {

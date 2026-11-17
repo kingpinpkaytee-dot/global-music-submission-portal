@@ -94,7 +94,8 @@ FROM (VALUES
   'https://open.spotify.com/playlist/0pvSK8VymG36atzmXHZXMC','https://play.soundplate.com/bvchspl',NULL::text,'portal',true,
   'https://soundplate.com/beach-vibes-chill-spotify-playlist-submit-music-here/')
 ) AS v(category,name,country,dsp_name,genres,website_url,submission_url,contact_email,submission_method,accepts_free_submissions,source_url)
-WHERE NOT EXISTS (
+WHERE v.name NOT ILIKE 'PlaylistDock%'
+AND NOT EXISTS (
  SELECT 1 FROM public.opportunity_discovery_candidates c
  WHERE c.category=v.category AND lower(c.source_url)=lower(v.source_url)
    AND lower(c.name)=lower(v.name)
