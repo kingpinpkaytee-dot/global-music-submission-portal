@@ -210,3 +210,45 @@ This final release record supersedes earlier sections that described the three c
 ### Final deployment provenance cross-check
 
 Cloudflare's deployment history independently confirms production deployment ID `621778f3-a6f6-483e-810e-ee849eebd5c2`, environment `Production`, branch `main`, source `064b648`. A live-content comparison against GitHub main verified that all nine published public artifacts (HTML, robots, sitemap, three JavaScript modules, public config, social SVG and Google verification file) are byte-for-byte identical after normalising Windows/Unix line endings. This confirms the production alias serves the merged main-branch public files, not merely an earlier preview.
+
+
+## IndexNow discovery notification — 2026-11-17
+
+The owner directed the release to proceed beyond deployment. IndexNow key verification and sitemap URL notification were implemented for all three production hosts.
+
+### Public key files
+- Artist Frequency: `https://global-music-submission-portal.pages.dev/410a094d5ddc43e98998bab2842bcc3b.txt`
+- DiggerMan Official: `https://kingpinpkaytee-dot.github.io/diggerman-site/37e658ddc5d342f08c30ba472c927782.txt`
+- The Kingpin Entertainment: `https://kingpinpkaytee-dot.github.io/thekingpin-entertainment-site/688013e9be264e31a11c877b2d2c8599.txt`
+
+All three key files were fetched from their live production URLs. Each returned HTTP 200 with `text/plain` and its exact matching key contents. The keys are intentionally public IndexNow verification proofs, not payment credentials or application secrets.
+
+### Cloudflare production key-file release
+- A second sanitized Cloudflare Pages production deployment was completed to publish the Artist Frequency key file.
+- Deployment ID: `3bb98c90-02e5-4533-aea7-67c75ccb0a68`; source commit: `935db5b`; branch: `main`.
+- A 21-path production smoke test (homepage, robots, sitemap, JavaScript/config modules, SVG asset, Google verification path, new IndexNow key file and dashboard/account/discovery/marketplace/campaigns/profile/stats/Premium/billing/admin routes) returned HTTP 200 throughout.
+- Production canonical and Open Graph URL are the selected Pages hostname. The Google verification meta tag remains present. The retired `.org` hostname is absent from homepage, robots and sitemap.
+
+### URL notification results
+Using the live sitemap contents and the verified host-specific key files, one bulk POST was submitted to the official IndexNow global endpoint per host:
+- Artist Frequency: 1 sitemap URL.
+- DiggerMan Official: 71 sitemap URLs (homepage, music index, SmartLinks and 68 track pages).
+- The Kingpin Entertainment: 1 sitemap URL.
+- Total: 73 URL notifications submitted.
+
+All three POST requests returned HTTP 202 Accepted. This is the documented first-submission response while the endpoint verifies the key file. It confirms receipt of the notifications, not that every page has already been crawled or indexed. IndexNow explicitly does not guarantee that submitted URLs will be crawled or indexed.
+
+### Additional live validation
+- DiggerMan: all 71 URLs listed in the live sitemap returned HTTP 200 on HEAD checks.
+- The Kingpin Entertainment: its sole sitemap URL returned HTTP 200.
+- Artist Frequency: 21 production smoke paths returned HTTP 200.
+- Artist Frequency local integration suite rerun on merged `main`: 34 tests passed, zero failures. This includes same-tab navigation, authentication-gated submissions, Google/Spotify OAuth wiring and Premium sandbox-only protections.
+
+### Search Console / Google indexing
+- IndexNow notifications are for participating IndexNow engines; they are not Google Search Console sitemap submissions.
+- The Artist Frequency Google verification meta tag and HTML verification file are present, but authenticated Search Console ownership and sitemap submission for the selected Pages URL have not been confirmed in this session.
+- Do not claim Google indexing or Search Console sitemap submission as completed. To submit Google sitemaps, the property owner must access the verified URL-prefix property in Google Search Console and submit the sitemap for each site that is supported there.
+- The prior PageSpeed Insights request returned HTTP 429 for the daily query quota; no Lighthouse/Core Web Vitals score is claimed.
+- DiggerMan W3C: the previous documented result remains 52 of 68 track pages clean; 16 validator requests returned Cloudflare HTTP 429 and remain unverified. A later serial retry again encountered validator rate limiting, so no expanded pass count is claimed.
+
+The SEO, Pages production and Supabase origin-hardening releases are complete. Remaining external acceptance items are Google Search Console verification/submission and an authenticated Paystack Test Mode checkout/webhook lifecycle test. No live customer charge or vendor payout was initiated.
