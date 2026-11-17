@@ -142,6 +142,15 @@ Candidate assets identified by filename:
 - Static responsive-CSS inspection found mobile breakpoints at 850px and 560px on Artist Frequency; DiggerMan and Kingpin contain responsive breakpoints covering widths from 900px down to 600px (and DiggerMan also at 720px), plus `prefers-reduced-motion` and forced-colors handling. This is stylesheet/source evidence, not a rendered device preview. No Lighthouse or Core Web Vitals scores are available from this run; browser-rendered mobile layout and performance testing remain open audit gates.
 - Payment-origin source corrections and documentation are on the Artist Frequency review branch only. Supabase secret values were not read or changed, and none of the Edge Functions was deployed. At the eventual approved release, set `APP_ORIGIN`, `CORS_ALLOWED_ORIGINS` and `PAYMENT_RETURN_URL` to the selected `pages.dev` production origin and run full Paystack sandbox acceptance tests.
 
+## Latest Artist Frequency preview redeployment — 2026-11-17
+
+- After the W3C accessibility/markup corrections, the sanitized public publish directory was redeployed from the updated branch head `ebd997aa4d51009b7c017a13602fe170ca85435f`.
+- Latest Cloudflare Pages preview deployment: `a0354f8a-cff2-42d4-ad84-3d00b16a5604`, source `ebd997a`, branch `seo/artist-frequency-visual-and-entity-seo-2026-11`.
+- Preview alias: https://seo-artist-frequency-visual.global-music-submission-portal.pages.dev/ . Immutable deployment URL: https://a0354f8a.global-music-submission-portal.pages.dev/ .
+- Direct Acer HTTP checks returned 200 for the homepage, `robots.txt`, `sitemap.xml`, all three JavaScript application modules, `supabase-config.js` and the SEO SVG.
+- The latest served HTML confirms the Pages canonical/OG URLs, the original Google verification meta tag and both required-select placeholder options. The retired `.org` hostname is absent from the live preview homepage, robots file and sitemap.
+- This is still a Preview deployment on the SEO branch. Cloudflare Production remains unchanged on `main` (`cd48f6f0-447c-407b-bf2b-05bb92c6ba21`).
+
 ## W3C Nu HTML validation — 2026-11-17
 
 - W3C Nu validator returned zero errors and zero warnings on the final Artist Frequency homepage, DiggerMan homepage, DiggerMan catalogue page and The Kingpin Entertainment homepage.
