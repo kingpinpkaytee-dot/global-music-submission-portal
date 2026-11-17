@@ -148,3 +148,20 @@ A fresh Supabase production inventory after deployment confirms all five payment
 | paystack-webhook | 11 | 09:40:04 |
 
 The four browser-facing functions show the post-release versions above. The webhook remains on its existing active version because no webhook source change was part of this origin-hardening release.
+
+
+## IndexNow notification rollout — 2026-11-17
+
+Three public IndexNow verification key files were added to the production repositories and deployed:
+
+- Artist Frequency: `/410a094d5ddc43e98998bab2842bcc3b.txt`
+- DiggerMan: `/diggerman-site/37e658ddc5d342f08c30ba472c927782.txt`
+- Kingpin: `/thekingpin-entertainment-site/688013e9be264e31a11c877b2d2c8599.txt`
+
+Each live key file was fetched and matched its exact key. The Artist Frequency key file was shipped in Cloudflare Pages production deployment `3bb98c90-02e5-4533-aea7-67c75ccb0a68` (source `935db5b`). A final 21-path production smoke check returned HTTP 200 for every path.
+
+Bulk IndexNow notifications were accepted for the live sitemap URL sets: Artist Frequency 1, DiggerMan 71, Kingpin 1, total 73. Each request returned HTTP 202 Accepted. Treat this as notification receipt/key-verification pending, not proof of completed crawling or indexing; IndexNow itself states URL submission does not guarantee indexing.
+
+DiggerMan's full 71-URL sitemap passed live HEAD checks (all HTTP 200). The Kingpin single sitemap URL returned HTTP 200. The Artist Frequency local test suite passed 34/34 after merge.
+
+Google Search Console has not been operated from this session. No authenticated Search Console sitemap submission or Google indexing status is asserted. The owner still needs to confirm the selected Pages URL-prefix property in Search Console and submit its sitemap. Paystack Test Mode remains pending authenticated admin acceptance; no real transaction, customer charge or payout was made.
