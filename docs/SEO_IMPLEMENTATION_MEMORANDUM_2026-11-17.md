@@ -3,7 +3,7 @@ Updated: 2026-11-17
 Status: IMPLEMENTATION IN PROGRESS — INDEXING HOLD
 
 ## Network structure
-1. Artist Frequency — https://globalmusicsubmissionportal.org/
+1. Artist Frequency — https://global-music-submission-portal.pages.dev/ (Cloudflare Pages hostname; selected canonical host). The former `.org` hostname is retired and must not be used.
 2. DiggerMan Official — https://kingpinpkaytee-dot.github.io/diggerman-site/
 3. The Kingpin Entertainment — https://kingpinpkaytee-dot.github.io/thekingpin-entertainment-site/
 
@@ -13,7 +13,7 @@ Cross-site authority flow: Artist Frequency → DiggerMan Official → The Kingp
 - DiggerMan homepage: improved Open Graph site identity, descriptive social-image ALT text, Twitter image ALT text and MusicGroup topical knowledge.
 - The Kingpin Entertainment homepage: expanded South African company description, company service/topic knowledge, Gauteng/Johannesburg/Riverlea service-area and locality metadata, improved Open Graph site identity and social-image ALT text.
 - Artist Frequency homepage: refined platform description, improved social-card type to summary_large_image, added site identity and a planned social preview asset reference.
-- Existing canonical URLs and robots directives retained.
+- Brand-specific canonical URLs and robots directives retained; Artist Frequency canonical, Open Graph URL, `robots.txt` sitemap target and sitemap homepage URL are corrected to the selected Cloudflare Pages hostname.
 - Existing DiggerMan MusicGroup and The Kingpin Organization JSON-LD retained and enriched rather than replaced.
 - Cloudinary asset-library verification confirms the six referenced SEO image assets exist as public image uploads; stored source dimensions are 1200×630 for Artist Frequency, 3000×3000 for the three DiggerMan release artworks, 1254×1254 for the selected Kingpin logo and 1376×1824 for the Riverlea archive image. This confirms asset records and dimensions, not deployed HTTP delivery status.
 - DiggerMan sitemap XML image namespace defect identified during review and corrected on its SEO branch; `image:image` and `image:loc` elements now have the required `xmlns:image` declaration.
@@ -56,9 +56,9 @@ Candidate assets identified by filename:
 - Artist Frequency Organization JSON-LD was refined so the platform does not incorrectly identify the separate DiggerMan and Kingpin websites as `sameAs` profiles; platform-specific `knowsAbout` topics now describe its actual service focus.
 - DiggerMan homepage code confirms all three newly uploaded release artworks are visibly presented as featured release cards with descriptive ALT text, dimensions and lazy loading.
 - The Kingpin homepage code references the owner-selected logo in navigation, Organization JSON-LD, Open Graph/Twitter preview and its image sitemap; Riverlea archive imagery is also presented in the gallery.
-- Critical Artist Frequency domain blocker: from the user's connected Windows device, both `globalmusicsubmissionportal.org` and `www.globalmusicsubmissionportal.org` return DNS NXDOMAIN using the default resolver; Google Public DNS (8.8.8.8) and Cloudflare DNS (1.1.1.1) also return NXDOMAIN. The `.org` registry RDAP endpoint returned HTTP 404 `Object not found`. The repository's `main` branch has no root `CNAME` file. The custom domain therefore cannot currently be verified as registered/delegated or live; do not submit its sitemap or request indexing. Confirm the intended registered domain/registrar before making DNS or GitHub Pages domain changes.
+- Artist Frequency hosting decision: the owner selected `https://global-music-submission-portal.pages.dev/` as the canonical production hostname and explicitly rejected the former `.org` hostname. The `.org` domain is retired and must not appear in canonical, Open Graph, sitemap or robots metadata. Wrangler 4.164.0 is authenticated on the connected Acer and Cloudflare Pages lists the `global-music-submission-portal` project with the expected `pages.dev` domain and no Git provider (Direct Upload project). The project inventory does not, by itself, establish the production branch or latest deployment details.
 - DiggerMan and The Kingpin GitHub Pages sites both returned HTTP 200. All five tested Cloudinary promotional/logo/archive image URLs returned HTTP 200 with image content types. Artist Frequency domain is the only tested live-site blocker.
-- The three live site URLs could not be retrieved by the available page-check path during this run; this is an inconclusive check, not evidence that the sites are offline.
+- Latest direct device checks: the Cloudflare Pages homepage responds HTTP 200, but its live `robots.txt`, sitemap and HTML still contain legacy `.org` references. This confirms the live deployment has not yet received the corrected SEO-branch content. The checked-in SEO branch contains the corrected `pages.dev` canonical/OG URL and preserved Google verification meta tag. Production must remain unchanged until the production branch/build settings are verified and the final audit is complete.
 
 ## Final audit gates — all required before indexing
 1. Verify every canonical URL and one preferred host/protocol.
