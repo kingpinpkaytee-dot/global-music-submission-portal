@@ -49,6 +49,12 @@ Candidate assets identified by filename:
 - DiggerMan: MusicGroup entity with artist identity, genres, Spotify/MusicBrainz and official social links; retain release and catalogue references.
 - Artist Frequency: Organization + WebSite entities; accurately describe free independent-artist submissions, playlist and radio discovery; no unsupported placement or reach claims.
 
+## Verification progress — 2026-11-17
+- DiggerMan repository tree confirms 68 individual track-page HTML files; all 68 were fetched and checked for a page title, meta description, canonical link, Open Graph title/description/image, Twitter card metadata and syntactically valid JSON-LD. All 68 passed this presence/syntax check.
+- DiggerMan sitemap contains 71 URL entries (homepage, music index, smartlinks page and 68 track pages) plus three image entries. The required image namespace is now declared and all image tags are balanced.
+- Cloudinary asset-library records confirm six referenced SEO images exist as public image uploads with stored source dimensions; deployed HTTP delivery, image rendering and deployed-site behaviour remain unverified.
+- The three live site URLs could not be retrieved by the available page-check path during this run; this is an inconclusive check, not evidence that the sites are offline.
+
 ## Final audit gates — all required before indexing
 1. Verify every canonical URL and one preferred host/protocol.
 2. Verify unique titles and meta descriptions on homepage, catalogue, release and important landing pages.
