@@ -21,9 +21,14 @@ Cross-site authority flow: Artist Frequency → DiggerMan Official → The Kingp
 Authorised source folder on the user's Windows device:
 C:\Users\USER\Downloads
 
+Approved company logo selection:
+- Use the original file `The Kingpin Entertainment_Logo.png` from the Downloads folder for The Kingpin Entertainment brand logo, navigation identity and social preview.
+- Do not substitute `kingpin_brand.png` unless the owner explicitly changes the selection.
+- Preserve the original artwork; do not redraw, recolour, crop or add text. Generate a resized/optimised derivative only when visual fidelity and transparency are preserved.
+
 Candidate assets identified by filename:
 - DiggerMan artist/release promotion: DiggerMan_SEGA_3000x3000.jpg; DiggerMan_Immortal_3000x3000.jpg; Digger-Man_One_Man_Show_3000x3000.jpg; CELESTIAL_FREQUENCY_2_3000x3000.jpg; celestial_frequency_3000x3000.jpg; celestial_signal_ep_cover_3000.jpg; No_Looking_Back_3000x3000.jpg; No_Looking_Back_2_3000x3000.jpg; Advertisement DiggerMan On Spotify.png; Spotify Promo Card.jpeg.
-- Company identity: The Kingpin Entertainment_Logo.png; kingpin_brand.png.
+- Company identity: The Kingpin Entertainment_Logo.png (approved); kingpin_brand.png (alternate, not selected).
 - Riverlea visual archive: riverlea_night_rap_scene.webp; riverlea_street_crowd.webp; balcony_overlook_crowd.webp.
 - Additional release art should be selected from the Downloads folder only after visual review and relevance checks.
 
