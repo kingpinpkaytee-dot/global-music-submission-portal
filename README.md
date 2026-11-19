@@ -18,21 +18,17 @@ Artist Frequency is a free, artist-first music discovery, campaign and music-sub
 - Marketplace weekly Top 5 is an admin-curated editorial selection, not an invented popularity chart.
 - Artists can create custom campaign briefs describing their desired website promotion. A campaign request does not guarantee placement.
 
-## Production status — 9 November 2026
+## Production status — 19 November 2026
 
-The Supabase production project is linked. Migrations **0001–0015** were previously confirmed applied; later discovery, payment and opportunity batches **0016–0025** are committed in the repository and must be checked against the production migration history before applying any missing migrations, in numeric order.
+The linked Supabase production project is `mdcvewnevgsgmyfnybgn` (West EU / Ireland). On 19 November, the Acer-side Supabase CLI successfully linked the checkout to this project and compared the local and remote migration ledgers.
 
-- **11/11 public tables have RLS enabled.**
-- **21 RLS policies** are installed.
-- Table and view grants follow least-privilege rules. Anonymous access is limited to intended public read surfaces; credit balances are authenticated-only; Marketplace listing views are read-only.
-- Default privileges for future objects are hardened: new public tables/views and sequences are not automatically granted to browser roles, and new functions do not inherit PUBLIC/browser-role execution. Client-facing permissions must be granted explicitly.
-- The weekly reset job is scheduled for Monday 00:05 South African time (Sunday 22:05 UTC).
-- The Marketplace publisher job runs every five minutes. Its production scheduler job has completed successfully in a recorded run.
-- The registration/profile trigger and credit ledger rules are deployed. The protected submission RPC validates integrated destinations and deducts credits atomically.
-- Weekly resets take the same per-artist profile-row lock as credit-charged submissions, so a submission racing the Monday reset cannot leave an off-by-one balance.
-- Migration 0014 adds structured artist genres and a press-kit URL to artist profiles.
-- Migration 0015 adds explicit integration/acceptance gates for directory destinations and protected admin directory management. Both submission flags default to false.
-- No production balances or artist records were changed by the permissions migrations.
+- Migration versions **0001–0031 all match** between Local, Remote and Time(UTC). No migration-version gaps or pending versions were listed.
+- Migration 0028 is recorded as applied and defines `opportunity_discovery_candidates.auto_verification` (jsonb), `auto_verified_at` (timestamptz) and the service-role-only autonomous publication RPC.
+- Migration 0029 is recorded as applied and defines the runtime policy-version-2 gate and stricter autonomous playlist checks.
+- Migration 0030 lowers the minimum eligible playlist follower count to **15** while retaining the active-status, response-rate, individual-Spotify-playlist, HTTPS-route and independent-corroboration gates.
+- Migration 0031 is recorded as applied and creates Premium subscription/credit-grant records plus a service-role-only payment-settlement function.
+
+**Important distinction:** migration-history alignment is not, by itself, proof that every live column and function definition is present. Earlier logs reported the 0028 verification column missing. That older diagnostic must be reconciled with a fresh read-only production catalog query for both 0028 columns, the policy-version-2 row and the hardened RPC before autonomous publication is considered runtime-verified. Do not use `db push` or reapply migrations simply because an older log is stale; first verify the live catalog. No migration write was performed during the 19 November comparison.
 
 ## Live frontend integration
 
@@ -104,9 +100,19 @@ For a **new** Supabase environment, apply migrations in numeric order and then v
 - Complete protected admin tools for campaign review and weekly Top 5 selection; directory creation/update and Marketplace moderation are already available in the admin workspace.
 - Publish privacy, terms, content-rights and moderation policies before public launch.
 
-## Vercel hosting state
+## Production hosting state
 
-The canonical `artist-frequency` Vercel project remains paused, so its production domain cannot serve an untested release. The latest code is available in a separate SSO-protected project named `artist-frequency-preview` (`artist-frequency-preview-qvxljsysr.vercel.app`). Vercel reports that deployment as the Production target within this isolated preview-named project; it is not the canonical production site. Vercel automatic GitHub deployments remain pending a GitHub Login Connection under Vercel account Settings → Authentication. Do not unpause the canonical project or assign its production domain until hosted-browser validation is complete and production release is authorised.
+The selected public Artist Frequency production host is **Cloudflare Pages**:
+
+- Project: `global-music-submission-portal`.
+- Production hostname: `https://global-music-submission-portal.pages.dev/`.
+- Latest listed production deployment: `3bb98c90-02e5-4533-aea7-67c75ccb0a68`, branch `main`, source commit `935db5b`.
+- The 17 November production release record documents a 21-path smoke test with HTTP 200 responses after this deployment.
+- Wrangler reports no Git provider connection for the Pages project. Treat it as a direct-upload/manual deployment until Cloudflare Git integration is separately configured.
+
+The supplied hostname `artist-frequency-global-music-submission-portal.pages.dev` is not configured for this project. Use `global-music-submission-portal.pages.dev` in canonical metadata, sitemap/robots references, payment origins, CORS allowlists and OAuth return URLs.
+
+The separate Vercel `artist-frequency` project is not the public production host. Its newest deployment record is BLOCKED while an older READY deployment still serves its own Vercel alias. The separate `artist-frequency-preview` project is SSO-protected and marked `noindex`; it is for private review only. Do not unpause the Vercel project or replace the selected Cloudflare Pages production origin as part of routine checks.
 
 ## Further documentation
 
@@ -120,9 +126,9 @@ See `docs/PRODUCT_RULES_AND_INTEGRATIONS.md`, `docs/PLATFORM_ARCHITECTURE.md`, `
 
 The hourly worker uses the public Bing Search RSS feed (`https://www.bing.com/search?format=rss`). It requires no API key, paid account or prepaid balance. It rotates through the global query pool, unwraps Bing redirect links where possible, and inspects the destination publisher page before considering an opportunity. This is an RSS feed, not the retired Bing Search APIs (retired 11 August 2025), and it has no service-level guarantee. Search titles and snippets are transient; candidate records are derived from inspected publisher-page evidence.
 
-Migrations 0028 and 0029 are required for unattended publication. Migration 0028 adds structured verification evidence and the service-role-only publication RPC. Migration 0029 adds the version-2 runtime policy gate, exact Spotify URL checks, strict follower/activity/response-rate checks, independent-domain corroboration checks, duplicate serialization and preservation of the non-integrated/non-accepting state. The worker will keep public publication disabled until the production database reports policy version 2. The last verified production logs still showed the 0028 column missing; repository commits do not apply Supabase migrations.
+Migrations 0028–0030 are present in the local source and are recorded as applied in the linked production migration history. Migration 0028 adds structured verification evidence and the service-role-only publication RPC. Migration 0029 adds the version-2 runtime policy gate, exact Spotify URL checks, strict follower/activity/response-rate checks, independent-domain corroboration checks, duplicate serialization and preservation of the non-integrated/non-accepting state. Migration 0030 changes the follower minimum to 15. The worker must remain publication-disabled until a read-only production catalog check confirms the 0028 columns, the policy-version-2 row and the current RPC definition. A migration-list match alone does not prove those runtime objects are present.
 
-Published directory records remain external reference listings only: is_integrated=false and accepts_submissions=false. This automation does not send artist music, dispatch emails, follow playlists, create streams or deduct credits. Spotify playlist metadata is linked back to Spotify; the worker does not scrape playlist contents or use Spotify content to train models.
+Published directory records remain external reference listings only: `is_integrated=false` and `accepts_submissions=false`. This automation does not send artist music, dispatch emails, follow playlists, create streams or deduct credits. Spotify playlist metadata is linked back to Spotify; the worker does not scrape playlist contents or use Spotify content to train models.
 
 ## Publication safety history
 
