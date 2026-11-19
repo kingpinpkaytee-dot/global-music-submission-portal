@@ -1,13 +1,15 @@
-# Artist Frequency — Vercel Deployment State
+# Artist Frequency — Vercel Auxiliary Project State
 
-**Updated:** 9 November 2026
+**Updated:** 9 November 2026 (historical Vercel project record; production-host correction added 19 November 2026)
+
+> **Current production host:** Artist Frequency's selected public production site is Cloudflare Pages at `https://global-music-submission-portal.pages.dev/` (Pages project `global-music-submission-portal`). This document records the separate Vercel projects only. Do not use a Vercel project URL as the public production canonical host. The latest Cloudflare Production deployment is `3bb98c90-02e5-4533-aea7-67c75ccb0a68` (main source `935db5b`); the Pages project currently has no Git provider connection and uses Wrangler direct uploads.
 
 ## Vercel team
 
 - Team: `kingpinpkaytee-8365s-projects` (Hobby plan).
 - Canonical project: `artist-frequency`.
 - Canonical project ID: `prj_CL4dVu2ZkLZ1hwgtfDTA7ICAiQQ2`.
-- The canonical project remains paused. Do not unpause it until the protected preview has passed browser validation and production release is explicitly authorised.
+- The Vercel project remains paused for new production releases. It is separate from the selected Cloudflare Pages production host; do not unpause it or route public traffic to it as part of routine verification.
 
 ## Current isolated preview project
 
@@ -35,9 +37,7 @@ The Dashboard now acts as a workspace launcher. Each selection opens a dedicated
 
 ## Canonical production safety
 
-An earlier upload included `main` branch metadata and Vercel inferred a production target. That deployment was already READY and could not be cancelled. The canonical `artist-frequency` project was paused to keep its production domain from serving an untested release.
-
-Its default production alias `artist-frequency.vercel.app` should remain unavailable while the project is paused. The latest attempt to deploy updated files to that paused project was blocked. Do not unpause it or assign production traffic as part of preview work.
+An earlier upload included `main` branch metadata and Vercel inferred a production target. The Vercel project was paused to prevent additional unreviewed releases. The older READY deployment still serves its own Vercel alias, while the latest deployment record is BLOCKED. This Vercel alias is not the public production portal and must not be used in canonical metadata, sitemaps, payment origins or OAuth redirect configuration. Do not unpause the Vercel project or assign public traffic to it.
 
 ## GitHub automatic deployments
 
@@ -51,7 +51,7 @@ To enable automatic deployments:
 
 The Vercel connector still does not report a Git-linked project or GitHub Login Connection. Do not assume Git pushes automatically deploy until this is confirmed in Vercel.
 
-## Remaining launch gates
+## Remaining application acceptance gates
 
 - Complete browser sign-up, email confirmation, sign-in, sign-out and password-recovery checks over HTTPS.
 - Exercise artist profile saves, live credit balance and destination selector with an artist test account.
